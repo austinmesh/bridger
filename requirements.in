@@ -1,0 +1,8 @@
+dataclasses-json
+influxdb-client
+loguru
+meshtastic
+paho-mqtt
+protobuf
+python-dotenv
+sentry-sdk
