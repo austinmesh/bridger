@@ -1,13 +1,10 @@
-import inspect
 import os
 from dataclasses import dataclass, field
 from typing import Optional
 
 from dataclasses_json import Undefined, config, dataclass_json
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
-from meshtastic.portnums_pb2 import PortNum
 
 INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "meshtastic")
 INFLUX_ORG = os.getenv("INFLUX_ORG", "austinmesh")
