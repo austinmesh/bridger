@@ -36,6 +36,6 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6.0.2
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.set_tags.outputs.tags }}
