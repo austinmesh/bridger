@@ -22,7 +22,16 @@ class MeshBridge(Client):
         super().__init__(*args, **kwargs)
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
-        self.subscribe(MQTT_TOPIC)
+        if reason_code != 0:
+            logger.error(f"Connection failed with code: {reason_code}. Attempting to reconnect...")
+            return
+
+        subscription = self.subscribe(MQTT_TOPIC)
+
+        if subscription[0] != 0:
+            logger.error(f"Failed to subscribe to topic: {MQTT_TOPIC}")
+            return
+
         logger.success(f"Connected and subscribed to topic: {MQTT_TOPIC}")
 
     def on_message(self, client, userdata, message):
@@ -49,6 +58,7 @@ if __name__ == "__main__":
         client = MeshBridge(CallbackAPIVersion.VERSION2)
         client.username_pw_set(MQTT_USER, MQTT_PASS)
         client.connect(MQTT_BROKER, 1883, 60)
+        client.reconnect_delay_set(min_delay=5, max_delay=120)
         client.loop_forever(retry_first_connection=True)
     except KeyboardInterrupt:
         logger.info("Exiting...")
