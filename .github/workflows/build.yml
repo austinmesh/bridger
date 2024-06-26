@@ -64,4 +64,4 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Deploy Quadlets
-        run: scripts/deploy.sh
+        run: config/deploy.sh
