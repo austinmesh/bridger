@@ -37,7 +37,18 @@ class MeshBridge(Client):
     def on_message(self, client, userdata, message):
         received_message = f"Received message on topic {message.topic}"
         logger.info(received_message)
-        add_breadcrumb(data=base64.b64encode(message.payload), category="mqtt", message=received_message)
+
+        breadcrumb_data = {
+            "topic": message.topic,
+            "payload": base64.b64encode(message.payload)
+        }
+
+        add_breadcrumb(
+            level="info",
+            data=breadcrumb_data,
+            category="mqtt",
+            message=received_message
+        )
 
         try:
             serice_envelope = ServiceEnvelope.FromString(message.payload)
