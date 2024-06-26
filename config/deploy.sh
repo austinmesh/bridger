@@ -4,7 +4,7 @@ set -eo pipefail
 
 QUADLET_LOCATION="config/quadlet"
 UNIT_LOCATION="$HOME/.config/containers/systemd"
-SERVICES=$(ls -1 "$QUADLET_LOCATION" | grep -E '\.container$' | sed 's/\.container$//')
+SERVICES=($(ls -1 "$QUADLET_LOCATION" | grep -E '\.container$' | sed 's/\.container$//'))
 
 cp -r $QUADLET_LOCATION/* "$UNIT_LOCATION"
 systemctl --user daemon-reload
