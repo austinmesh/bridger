@@ -1,0 +1,19 @@
+[Container]
+HostName = emqx
+Image = docker.io/emqx/emqx:5.1.6
+Network = bridger.network
+PublishPort = 1883:1883
+PublishPort = 8083:8083
+PublishPort = 8084:8084
+PublishPort = 8883:8883
+PublishPort = 18083:18083
+Environment = EMQX_ALLOW_ANONYMOUS=false
+Environment = EMQX_DEFAULT_LOG_HANDLER=console
+Volume = emqx-config.volume:/opt/emqx/etc
+Volume = emqx-data.volume:/opt/emqx/data
+
+[Service]
+Restart = always
+
+[Install]
+WantedBy = default.target

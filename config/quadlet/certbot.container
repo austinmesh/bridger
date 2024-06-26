@@ -1,0 +1,8 @@
+[Container]
+HostName = certbot
+Exec = certonly --standalone --non-interactive -d mqtt.austinmesh.org --http-01-port 8094
+PublishPort = 8094:8094
+Image = docker.io/certbot/certbot:v2.11.0
+Volume = letsencrypt-conf.volume:/etc/letsencrypt
+Volume = letsencrypt-data.volume:/var/lib/letsencrypt
+Network = bridger.network

@@ -6,6 +6,7 @@ Environment = GF_AUTH_ANONYMOUS_ENABLED=true
 Environment = GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 Environment = GF_AUTH_ANONYMOUS_ORG_NAME="Austin Mesh"
 Environment = GF_AUTH_ANONYMOUS_HIDE_VERSION=true
+Environment = GF_SECURITY_ALLOW_EMBEDDING=true
 Network = bridger.network
 
 [Service]
