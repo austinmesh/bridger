@@ -63,9 +63,9 @@ class NodeInfoPoint(TelemetryPoint):
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class PositionPoint(TelemetryPoint):
-    time: str
     latitude_i: int
     longitude_i: int
+    time: Optional[str] = None
     altitude: Optional[int] = None
     PDOP: Optional[int] = None
     sats_in_view: Optional[int] = None
