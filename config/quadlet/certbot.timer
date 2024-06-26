@@ -1,0 +1,4 @@
+[Timer]
+Unit = certbot.service
+# Twice a day
+OnCalendar = *-*-* 0,12:00:00

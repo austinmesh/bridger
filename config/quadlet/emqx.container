@@ -9,8 +9,13 @@ PublishPort = 8883:8883
 PublishPort = 18083:18083
 Environment = EMQX_ALLOW_ANONYMOUS=false
 Environment = EMQX_DEFAULT_LOG_HANDLER=console
+Environment = EMQX_LISTENER__SSL__KEYFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/privkey.pem
+Environment = EMQX_LISTENER__SSL__CERTFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/fullchain.pem
+Environment = EMQX_LISTENER__WSS__KEYFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/privkey.pem
+Environment = EMQX_LISTENER__WSS__CERTFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/fullchain.pem
 Volume = emqx-config.volume:/opt/emqx/etc
 Volume = emqx-data.volume:/opt/emqx/data
+Volume = certbot-conf.volume:/etc/letsencrypt
 
 [Service]
 Restart = always

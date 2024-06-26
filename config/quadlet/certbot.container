@@ -1,3 +1,6 @@
+[Unit]
+Before = emqx.service
+
 [Container]
 HostName = certbot
 Exec = certonly --standalone --non-interactive --agree-tos -d mqtt.austinmesh.org --email andys@andyshinn.as
@@ -6,3 +9,10 @@ Image = docker.io/certbot/certbot:v2.11.0
 Volume = certbot-conf.volume:/etc/letsencrypt
 Volume = certbot-data.volume:/var/lib/letsencrypt
 Network = bridger.network
+
+[Service]
+Type = oneshot
+RemainAfterExit = no
+
+[Install]
+WantedBy = default.target
