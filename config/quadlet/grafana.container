@@ -1,0 +1,15 @@
+[Container]
+Image = docker.io/grafana/grafana-oss:10.4.4
+PublishPort = 3000:3000
+Volume = grafana-storage.volume:/var/lib/grafana
+Environment = GF_AUTH_ANONYMOUS_ENABLED=true
+Environment = GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+Environment = GF_AUTH_ANONYMOUS_ORG_NAME="Austin Mesh"
+Environment = GF_AUTH_ANONYMOUS_HIDE_VERSION=true
+Network = bridger.network
+
+[Service]
+Restart = always
+
+[Install]
+WantedBy = default.target

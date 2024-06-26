@@ -1,0 +1,13 @@
+[Container]
+Image = ghcr.io/andyshinn/bridger:main
+Environment = INFLUX_URL=http://influxdb:8086
+EnvironmentFile = /home/andy/.config/bridger.env
+Network = bridger.network
+HostName = bridger
+Pull = always
+
+[Install]
+WantedBy = default.target
+
+[Service]
+Restart = always

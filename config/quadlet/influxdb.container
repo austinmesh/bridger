@@ -1,0 +1,13 @@
+[Container]
+Image = influxdb:2.7.6
+PublishPort = 8086:8086
+Volume = influxdb-data.volume:/var/lib/influxdb2
+Volume = influxdb-config.volume:/etc/influxdb2
+Network = bridger.network
+HostName = influxdb
+
+[Service]
+Restart = always
+
+[Install]
+WantedBy = default.target

@@ -2,11 +2,18 @@ name: build
 
 on:
   push:
+    tags:
+      - '*.*.*'
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
+
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     permissions:
       contents: read
@@ -35,9 +42,9 @@ jobs:
       - name: Set Docker tags
         id: set_tags
         run: |
-          echo "::set-output name=tags::ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:$BRANCH_NAME"
+          echo "tags=ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:$BRANCH_NAME" >> $GITHUB_OUTPUT
           if [ "$BRANCH_NAME" == "main" ]; then
-            echo "::set-output name=tags::ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:$BRANCH_NAME,ghcr.io/${{ github.repository }}:latest"
+            echo "tags=ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:$BRANCH_NAME,ghcr.io/${{ github.repository }}:latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push
@@ -46,3 +53,11 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.set_tags.outputs.tags }}
+
+  deploy:
+    runs-on: self-hosted
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy Quadlets
+        run: scripts/deploy.sh
