@@ -96,7 +96,8 @@ class PBPacketProcessor(PacketProcessor):
             if self.portnum == PortNum.NODEINFO_APP:
                 return NodeInfoPoint(**point_data)
             elif self.portnum == PortNum.POSITION_APP:
-                return PositionPoint(**point_data)
+                if "latitude_i" in self.payload_as_dict and "longitude_i" in self.payload_as_dict:
+                    return PositionPoint(**point_data)
             elif self.portnum == PortNum.TELEMETRY_APP:
                 if "environment_metrics" in self.payload_as_dict:
                     # move environment_metrics to top level
@@ -126,13 +127,13 @@ if __name__ == "__main__":
         service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
         logger.info(f"Service envelope: \n{service_envelope}")
 
-        processor = PBPacketProcessor(service_envelope)
-        logger.info(f"Decoded packet: \n{processor.data}")
-
         decoded_payload = DECODERS[service_envelope.packet.decoded.portnum].FromString(
             service_envelope.packet.decoded.payload
         )
         logger.info(f"Decoded payload: \n{decoded_payload}")
+
+        processor = PBPacketProcessor(service_envelope)
+        logger.info(f"Decoded packet: \n{processor.data}")
 
     except PacketProcessorError as e:
         logger.warning(f"Error processing packet: {e}")
