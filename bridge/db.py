@@ -72,6 +72,7 @@ class PositionPoint(TelemetryPoint):
     latitude_i: int
     longitude_i: int
     time: Optional[str] = None
+    precision_bits: Optional[int] = None
     altitude: Optional[int] = None
     PDOP: Optional[int] = None
     sats_in_view: Optional[int] = None
