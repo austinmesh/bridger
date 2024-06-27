@@ -1,6 +1,6 @@
-from abc import ABC
-from argparse import ArgumentParser
 import base64
+from abc import ABC, abstractmethod
+from argparse import ArgumentParser
 from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
@@ -27,7 +27,43 @@ DECODER_DATA_MAPPING = {
 }
 
 
+class PacketProcessorError(Exception):
+    def __init__(self, message, portnum=None):
+        super().__init__(message)
+        self.portnum = portnum
+
+
 class PacketProcessor(ABC):
+    @property
+    @abstractmethod
+    def payload_as_dict(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def data(self):
+        raise NotImplementedError
+
+
+# TODO: Implement a JSONPacketProcessor class to process packets that come in as JSON instead of protobuf
+# class JSONPacketProcessor(PacketProcessor):
+#     pass
+
+
+class PBPacketProcessor(PacketProcessor):
+    def __init__(self, service_envelope: ServiceEnvelope):
+        self.service_envelope = service_envelope
+
+        # Throw exception if service envelope is a type in the DECODERS dict
+        if service_envelope.packet.decoded.portnum not in DECODERS:
+            raise PacketProcessorError(
+                f"We cannot yet decode: {PortNum.Name(service_envelope.packet.decoded.portnum)}",
+                portnum=service_envelope.packet.decoded.portnum,
+            )
+
+        self.portnum: PortNum = service_envelope.packet.decoded.portnum
+        self.payload = DECODERS[self.portnum].FromString(service_envelope.packet.decoded.payload)
+
     @property
     def payload_as_dict(self):
         return MessageToDict(
@@ -35,42 +71,6 @@ class PacketProcessor(ABC):
             preserving_proto_field_name=True,
             use_integers_for_enums=True,
         )
-
-
-# TODO: Implement a JSONPacketProcessor class to process packets that come in as JSON instead of protobuf
-# class JSONPacketProcessor(PacketProcessor):
-#     def __init__(self, packet: str):
-#         super().__init__(packet)
-
-#     @property
-#     def payload(self) -> dict:
-#         payload = self.packet.payload
-#         try:
-#             message = decoders[PortNum.NODEINFO_APP].FromString(payload)
-#             message_dict = MessageToDict(message)
-#         except KeyError as e:
-#             logger.exception(f"Unknown port number: {e}")
-#         except DecodeError as e:
-#             logger.exception(f"Error decoding message: {e}")
-
-#         return message_dict
-
-
-class PBPacketProcessor(PacketProcessor):
-    def __init__(self, service_envelope: ServiceEnvelope):
-        self.service_envelope = service_envelope
-
-        try:
-            self.portnum: PortNum = service_envelope.packet.decoded.portnum
-
-            if self.portnum in DECODERS:
-                self.payload = DECODERS[self.portnum].FromString(service_envelope.packet.decoded.payload)
-            else:
-                logger.info(f"Skipping unknown port number: {self.portnum}")
-        except KeyError as e:
-            logger.exception(f"Unknown port number: {e}")
-        except DecodeError as e:
-            logger.exception(f"Error decoding message: {e}")
 
     # Return payload fit for the database dataclass models depending on the packet type
     @property
@@ -116,6 +116,7 @@ class PBPacketProcessor(PacketProcessor):
             logger.error(f"KeyError: {e}")
             return None
 
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("packet", help="Base64 encoded protobuf message")
@@ -125,13 +126,17 @@ if __name__ == "__main__":
         service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
         logger.info(f"Service envelope: \n{service_envelope}")
 
-        decoded_payload = DECODERS[service_envelope.packet.decoded.portnum].FromString(service_envelope.packet.decoded.payload)
-        logger.info(f"Decoded payload: \n{decoded_payload}")
-
         processor = PBPacketProcessor(service_envelope)
         logger.info(f"Decoded packet: \n{processor.data}")
 
+        decoded_payload = DECODERS[service_envelope.packet.decoded.portnum].FromString(
+            service_envelope.packet.decoded.payload
+        )
+        logger.info(f"Decoded payload: \n{decoded_payload}")
+
+    except PacketProcessorError as e:
+        logger.warning(f"Error processing packet: {e}")
     except DecodeError as e:
-        logger.error(f"Error decoding message: {e}")
+        logger.exception(f"Error decoding message: {e}")
     except Exception as e:
-        logger.error(f"Error processing packet: {e}")
+        logger.exception(f"Error processing packet: {e}")

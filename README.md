@@ -1,6 +1,6 @@
 # bridger
 
-Bridger is a Meshtastic MQTT to InfluxDB metrics birdge. It listens to mQTT for protobuf messages and uses those to push metrics to InfluxDB.
+Bridger is a Meshtastic MQTT to InfluxDB metrics bridge. It listens to MQTT for protobuf messages and uses those to push metrics to InfluxDB.
 
 ## Usage
 
@@ -26,5 +26,5 @@ pip install -r requirements.txt
 And run the script:
 
 ```bash
-python -m bridge.mqtt
+python -m bridge
 ```

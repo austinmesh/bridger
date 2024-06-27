@@ -1,6 +1,7 @@
 [Container]
 Image = ghcr.io/andyshinn/bridger:main
 Environment = INFLUX_URL=http://influxdb:8086
+Environment = MQTT_BROKER=emqx
 EnvironmentFile = /home/andy/.config/bridger.env
 Network = bridger.network
 HostName = bridger

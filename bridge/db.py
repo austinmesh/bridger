@@ -5,6 +5,8 @@ from typing import Optional
 from dataclasses_json import Undefined, config, dataclass_json
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.rest import ApiException
+from loguru import logger
 
 INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "meshtastic")
 INFLUX_ORG = os.getenv("INFLUX_ORG", "austinmesh")
@@ -29,6 +31,7 @@ class TelemetryPoint:
     channel_id: str
     gateway_id: str
 
+
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class SensorTelemetryPoint(TelemetryPoint):
@@ -41,6 +44,7 @@ class SensorTelemetryPoint(TelemetryPoint):
     iaq: Optional[int] = None
     channel_utilization: Optional[float] = None
 
+
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class DeviceTelemetryPoint(TelemetryPoint):
@@ -49,6 +53,7 @@ class DeviceTelemetryPoint(TelemetryPoint):
     air_util_tx: Optional[float] = None
     channel_utilization: Optional[float] = None
     uptime_seconds: Optional[int] = None
+
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
@@ -59,6 +64,7 @@ class NodeInfoPoint(TelemetryPoint):
     macaddr: Optional[str] = None
     hw_model: Optional[str] = None
     role: Optional[str] = None
+
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
@@ -76,14 +82,18 @@ def write_point(telemetry_data: TelemetryPoint):
     common_tags = ["channel_id", "gateway_id", "_from", "to"]
 
     def write_data(record, record_measurement_name, record_field_keys, record_tag_keys):
-        write_api.write(
-            bucket=INFLUX_BUCKET,
-            org=INFLUX_ORG,
-            record=record,
-            record_measurement_name=record_measurement_name,
-            record_field_keys=record_field_keys + common_fields,
-            record_tag_keys=record_tag_keys + common_tags,
-        )
+        try:
+            write_api.write(
+                bucket=INFLUX_BUCKET,
+                org=INFLUX_ORG,
+                record=record,
+                record_measurement_name=record_measurement_name,
+                record_field_keys=record_field_keys + common_fields,
+                record_tag_keys=record_tag_keys + common_tags,
+            )
+        except ApiException as e:
+            if e.status == 401:
+                logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
 
     if isinstance(telemetry_data, NodeInfoPoint):
         node_info_tags = ["long_name", "short_name", "hw_model"]
