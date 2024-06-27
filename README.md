@@ -28,3 +28,22 @@ And run the script:
 ```bash
 python -m bridge
 ```
+
+## Node Setup
+
+To get your Meshtastic node to send metrics to the MQTT broker you will need to set the following settings:
+
+MQTT Module:
+
+* Enabled: `Checked`
+* MQTT Server Address: `mqtt.austinmesh.org`
+* MQTT Username: <created_per_user>
+* MQTT Password: <created_per_user>
+* Encryption Enabled: `Unchecked`
+* JSON Enabled: `Unchecked`
+* TLS Enabled: `Unchecked`
+* Root topic: `egr/home`
+
+Primary Channel:
+
+* Uplink Enabled: `Checked`
