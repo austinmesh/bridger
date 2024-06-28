@@ -38,7 +38,7 @@ class MeshBridge(Client):
     def on_message(self, client, userdata, message):
         received_message = "Received message"
         logger.info(received_message)
-        logger.debug(f"Message payload base54 encoded: {base64.b64encode(message.payload)}")
+        logger.debug(f"Message payload base64 encoded: {base64.b64encode(message.payload)}")
 
         breadcrumb_data = {"topic": message.topic, "payload": base64.b64encode(message.payload)}
 
