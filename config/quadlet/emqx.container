@@ -14,6 +14,7 @@ Environment = EMQX_LISTENER__SSL__CERTFILE=/etc/letsencrypt/live/mqtt.austinmesh
 Environment = EMQX_LISTENER__WSS__KEYFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/privkey.pem
 Environment = EMQX_LISTENER__WSS__CERTFILE=/etc/letsencrypt/live/mqtt.austinmesh.org/fullchain.pem
 Environment = EMQX_NODE__COOKIE=emqx_austinmesh
+Environment = EMQX_HOST=emqx
 Volume = emqx-config.volume:/opt/emqx/etc
 Volume = emqx-data.volume:/opt/emqx/data
 Volume = certbot-conf.volume:/etc/letsencrypt
