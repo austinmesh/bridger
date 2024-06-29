@@ -107,7 +107,10 @@ def write_point(telemetry_data: TelemetryPoint):
         write_data(telemetry_data, "position", position_fields, position_tags)
 
     elif isinstance(telemetry_data, SensorTelemetryPoint):
-        sensor_tags = [
+        sensor_tags = []
+        sensor_fields = [
+            "air_util_tx",
+            "channel_utilization",
             "barometric_pressure",
             "current",
             "gas_resistance",
@@ -116,7 +119,6 @@ def write_point(telemetry_data: TelemetryPoint):
             "voltage",
             "uptime_seconds",
         ]
-        sensor_fields = ["air_util_tx", "channel_utilization"]
         write_data(telemetry_data, "sensor", sensor_fields, sensor_tags)
 
     elif isinstance(telemetry_data, DeviceTelemetryPoint):
