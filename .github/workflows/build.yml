@@ -31,6 +31,10 @@ jobs:
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
           elif [[ "${GITHUB_REF}" == refs/pull/* ]]; then
             BRANCH_NAME=$(echo ${GITHUB_REF} | sed 's#refs/pull/##; s#/merge##')
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            BRANCH_NAME=${GITHUB_REF#refs/tags/}
+          else
+            BRANCH_NAME=${GITHUB_REF}
           fi
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
 
@@ -61,7 +65,23 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
+      - name: Extract tag from ref
+        id: extract_tag
+        run: |
+          TAG=$(echo ${{ github.ref }} | sed 's#refs/tags/##')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: shinncloud
+        with:
+          environment: production
+          projects: bridger
+          version: ${{ github.ref }}
       - name: Deploy Quadlets
         run: config/deploy.sh
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ steps.extract_tag.outputs.tag }}
