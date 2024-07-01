@@ -1,7 +1,7 @@
 import sentry_sdk
 from dotenv import load_dotenv
 
-__VERSION__ = "0.1.7"
+__VERSION__ = "0.1.8"
 __APP_NAME__ = "bridger"
 
 load_dotenv()
