@@ -27,8 +27,6 @@ jobs:
       - name: Extract branch name
         id: extract_branch
         run: |
-          ls -al $RUNNER_TEMP
-
           if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
           elif [[ "${GITHUB_REF}" == refs/pull/* ]]; then
@@ -70,6 +68,9 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4.1.7
+
+      - name: Fix for missing _github_home dir
+        run: mkdir -p $RUNNER_TEMP/_github_home
 
       - name: Extract tag from ref
         id: extract_tag
