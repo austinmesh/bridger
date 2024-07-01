@@ -83,6 +83,7 @@ jobs:
           environment: production
           projects: bridger
           version: bridger@${{ github.ref }}
+          working_directory: ${{ github.workspace }}
       - name: Deploy Quadlets
         run: config/deploy.sh
         env:
