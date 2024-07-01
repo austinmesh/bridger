@@ -69,24 +69,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4.1.7
 
-      - name: Fix for missing _github_home dir
-        run: mkdir -p $RUNNER_TEMP/_github_home
-
       - name: Extract tag from ref
         id: extract_tag
         run: |
           TAG=$(echo ${{ github.ref }} | sed 's#refs/tags/##')
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
-      - name: Create Sentry release
-        uses: getsentry/action-release@v1.7.0
+
+      - name: Create Sentry release with shell
+        run: |
+          sentry-cli releases new ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
+          sentry-cli releases set-commits --auto ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
+          sentry-cli deploys new -e production ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
+          sentry-cli releases finalize ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: shinncloud
-        with:
-          environment: production
-          projects: bridger
-          version: bridger@${{ github.ref }}
-          working_directory: ${{ github.workspace }}
+          SENTRY_PROJECT: bridger
+
       - name: Deploy Quadlets
         run: config/deploy.sh
         env:
