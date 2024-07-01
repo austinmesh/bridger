@@ -111,10 +111,10 @@ class PBPacketProcessor(PacketProcessor):
                 logger.warning(f"Unknown port number: {self.portnum}")
                 return None
         except AttributeError as e:
-            logger.error(f"AttributeError: {e}")
+            logger.exception(f"AttributeError: {e}")
             return None
         except KeyError as e:
-            logger.error(f"KeyError: {e}")
+            logger.exception(f"KeyError: {e}")
             return None
 
 
@@ -126,11 +126,6 @@ if __name__ == "__main__":
     try:
         service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
         logger.info(f"Service envelope: \n{service_envelope}")
-
-        decoded_payload = DECODERS[service_envelope.packet.decoded.portnum].FromString(
-            service_envelope.packet.decoded.payload
-        )
-        logger.info(f"Decoded payload: \n{decoded_payload}")
 
         processor = PBPacketProcessor(service_envelope)
         logger.info(f"Decoded packet: \n{processor.data}")
