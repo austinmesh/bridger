@@ -27,6 +27,10 @@ jobs:
       - name: Extract branch name
         id: extract_branch
         run: |
+          ls -al ${runner.temp}
+
+          ls -al $RUNNER_TEMP
+
           if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
           elif [[ "${GITHUB_REF}" == refs/pull/* ]]; then
