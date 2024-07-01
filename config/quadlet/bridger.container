@@ -1,3 +1,7 @@
+[Unit]
+StartLimitInterval = 200
+StartLimitBurst = 5
+
 [Container]
 Image = ${IMAGE}
 Environment = INFLUX_URL=http://influxdb:8086
@@ -5,10 +9,10 @@ Environment = MQTT_BROKER=emqx
 EnvironmentFile = /home/andy/.config/bridger.env
 Network = bridger.network
 HostName = bridger
-Pull = always
 
 [Install]
 WantedBy = default.target
 
 [Service]
 Restart = always
+RestartSec = 30
