@@ -73,14 +73,14 @@ jobs:
           TAG=$(echo ${{ github.ref }} | sed 's#refs/tags/##')
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
       - name: Create Sentry release
-        uses: getsentry/action-release@v1
+        uses: getsentry/action-release@v1.7.0
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: shinncloud
         with:
           environment: production
           projects: bridger
-          version: ${{ github.ref }}
+          version: bridger@${{ github.ref }}
       - name: Deploy Quadlets
         run: config/deploy.sh
         env:
