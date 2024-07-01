@@ -27,8 +27,6 @@ jobs:
       - name: Extract branch name
         id: extract_branch
         run: |
-          ls -al ${runner.temp}
-
           ls -al $RUNNER_TEMP
 
           if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
