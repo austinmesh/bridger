@@ -78,7 +78,7 @@ jobs:
       - name: Create Sentry release with shell
         run: |
           sentry-cli releases new ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
-          sentry-cli releases set-commits --auto ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
+          sentry-cli releases set-commits --auto --ignore-missing --local ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
           sentry-cli deploys new -e production ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
           sentry-cli releases finalize ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
         env:
