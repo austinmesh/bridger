@@ -77,10 +77,12 @@ jobs:
 
       - name: Create Sentry release with shell
         run: |
-          sentry-cli releases new ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
-          sentry-cli releases set-commits --auto --ignore-missing ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
-          sentry-cli deploys new -e production ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
-          sentry-cli releases finalize ${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}
+          RELEASE="${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}"
+
+          sentry-cli releases new $RELEASE
+          sentry-cli releases set-commits --auto --ignore-missing $RELEASE
+          sentry-cli deploys new -e production -r $RELEASE
+          sentry-cli releases finalize $RELEASE
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: shinncloud
