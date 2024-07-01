@@ -67,6 +67,8 @@ jobs:
     needs: build
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
+      - uses: actions/checkout@v4.1.7
+
       - name: Extract tag from ref
         id: extract_tag
         run: |
