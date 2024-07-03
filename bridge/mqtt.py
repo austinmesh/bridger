@@ -1,5 +1,6 @@
 import base64
 import os
+from collections import deque
 
 from google.protobuf.message import DecodeError
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
@@ -16,6 +17,7 @@ MQTT_TOPIC = os.getenv("MQTT_TOPIC", "egr/home/2/e/#")
 class MeshBridge(Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.message_queue = deque(maxlen=100)
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code != 0:
@@ -45,6 +47,15 @@ class MeshBridge(Client):
 
         try:
             serice_envelope = ServiceEnvelope.FromString(message.payload)
+            packet_id = serice_envelope.packet.id
+
+            # Check if service_envelope ID is in the message queue and add it if not otherwise skip
+            if packet_id not in self.message_queue:
+                self.message_queue.append(packet_id)
+            else:
+                logger.bind(**breadcrumb_data, envelope_id=packet_id).debug(f"Packet {packet_id} was already in the queue")
+                return
+
             pb_processor = PBPacketProcessor(serice_envelope)
         except DecodeError as e:
             # This is a common error when the message is not a protobuf
@@ -67,6 +78,10 @@ class MeshBridge(Client):
 
         except PacketProcessorError as e:
             logger.info(e)
+            return
+
+        except AttributeError as e:
+            logger.exception(f"AttributeError: {e}")
             return
 
         set_user({"id": getattr(serice_envelope.packet, "from")})
