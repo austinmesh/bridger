@@ -109,6 +109,7 @@ class PBPacketProcessor(PacketProcessor):
                     return DeviceTelemetryPoint(**point_data)
             else:
                 logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
+                logger.debug(f"Payload: {self.payload_as_dict}")
                 return None
         except AttributeError as e:
             logger.exception(f"AttributeError: {e}")
