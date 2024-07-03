@@ -8,6 +8,7 @@ Exec = '-config.file=/mnt/config/loki.yaml'
 Image = docker.io/grafana/loki:3.1.0
 Volume = /home/andy/.config/bridger:/mnt/config
 Volume = loki-data.volume:/var/lib/loki
+Network = bridger.network
 
 [Install]
 WantedBy = default.target
