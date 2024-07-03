@@ -2,7 +2,7 @@ import base64
 import os
 
 from google.protobuf.message import DecodeError
-from meshtastic.mqtt_pb2 import ServiceEnvelope
+from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 

@@ -5,10 +5,10 @@ from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError
-from meshtastic.mesh_pb2 import Position, User
-from meshtastic.mqtt_pb2 import ServiceEnvelope
-from meshtastic.portnums_pb2 import PortNum
-from meshtastic.telemetry_pb2 import Telemetry
+from meshtastic.protobuf.mesh_pb2 import Position, User
+from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
+from meshtastic.protobuf.portnums_pb2 import PortNum
+from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
 from bridge.db import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint
 from bridge.log import logger, file_logger
