@@ -1,0 +1,37 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: bridger
+    pipeline_stages:
+      - json:
+          expression:
+            record: record
+            text: text
+            message: record.message
+            timestamp: record.time.timestamp
+            extra: record.extra
+            exception: record.exception
+            level: record.level.name
+            module: record.module
+            function: record.function
+            file: record.file
+            line: record.line
+            name: record.name
+            process: record.process
+            thread: record.thread
+
+
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: bridger
+          __path__: /var/lib/bridger/logs/*.log

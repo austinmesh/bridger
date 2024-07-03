@@ -6,7 +6,8 @@ from dataclasses_json import Undefined, config, dataclass_json
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
-from loguru import logger
+
+from bridge.log import logger
 
 INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "meshtastic")
 INFLUX_ORG = os.getenv("INFLUX_ORG", "austinmesh")
@@ -84,6 +85,15 @@ def write_point(telemetry_data: TelemetryPoint):
 
     def write_data(record, record_measurement_name, record_field_keys, record_tag_keys):
         try:
+            extra = {
+                "measurement": record_measurement_name,
+                "tags": record_tag_keys,
+                "fields": record_field_keys,
+                "common_fields": common_fields,
+                "common_tags": common_tags,
+                "record": record,
+            }
+
             write_api.write(
                 bucket=INFLUX_BUCKET,
                 org=INFLUX_ORG,
@@ -92,6 +102,7 @@ def write_point(telemetry_data: TelemetryPoint):
                 record_field_keys=record_field_keys + common_fields,
                 record_tag_keys=record_tag_keys + common_tags,
             )
+            logger.bind(**extra).info(f"Data written to InfluxDB: {record}")
         except ApiException as e:
             if e.status == 401:
                 logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")

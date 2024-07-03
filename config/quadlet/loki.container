@@ -1,0 +1,17 @@
+[Unit]
+StartLimitInterval = 200
+StartLimitBurst = 5
+
+[Container]
+HostName = loki
+Exec = '-config.file=/mnt/config/loki.yaml'
+Image = docker.io/grafana/loki:3.1.0
+Volume = /home/andy/.config/bridger:/mnt/config
+Volume = loki-data.volume:/var/lib/loki
+
+[Install]
+WantedBy = default.target
+
+[Service]
+Restart = always
+RestartSec = 30

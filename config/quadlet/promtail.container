@@ -3,14 +3,13 @@ StartLimitInterval = 200
 StartLimitBurst = 5
 
 [Container]
-Image = ${IMAGE}
-Environment = INFLUX_URL=http://influxdb:8086
-Environment = MQTT_BROKER=emqx
-Environment = LOG_PATH=/var/lib/bridger/logs
-EnvironmentFile = /home/andy/.config/bridger.env
+Exec = '-config.file=/mnt/config/promtail.yaml'
+Image = docker.io/grafana/promtail:3.1.0
 Network = bridger.network
-HostName = bridger
+HostName = promtail
 Volume = bridger-data.volume:/var/lib/bridger
+Volume = promtail-data.volume:/var/lib/promtail
+Volume = /home/andy/.config/bridger:/mnt/config
 
 [Install]
 WantedBy = default.target

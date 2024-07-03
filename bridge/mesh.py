@@ -5,13 +5,13 @@ from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import DecodeError
-from loguru import logger
 from meshtastic.mesh_pb2 import Position, User
 from meshtastic.mqtt_pb2 import ServiceEnvelope
 from meshtastic.portnums_pb2 import PortNum
 from meshtastic.telemetry_pb2 import Telemetry
 
 from bridge.db import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint
+from bridge.log import logger, file_logger
 
 DECODERS = {
     PortNum.NODEINFO_APP: User,
@@ -108,7 +108,7 @@ class PBPacketProcessor(PacketProcessor):
                     point_data.update(self.payload_as_dict["device_metrics"])
                     return DeviceTelemetryPoint(**point_data)
             else:
-                logger.warning(f"Unknown port number: {self.portnum}")
+                logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
                 return None
         except AttributeError as e:
             logger.exception(f"AttributeError: {e}")
@@ -119,6 +119,7 @@ class PBPacketProcessor(PacketProcessor):
 
 
 if __name__ == "__main__":
+    logger.remove(file_logger)
     parser = ArgumentParser()
     parser.add_argument("packet", help="Base64 encoded protobuf message")
     args = parser.parse_args()

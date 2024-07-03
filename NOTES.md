@@ -42,3 +42,35 @@ packet {
 channel_id: "LongFast"
 gateway_id: "!0c18aaf4"
 ```
+
+## InfluxDB
+
+### Queries
+
+Get nodes in multiple ways:
+
+Example #1:
+
+```
+from(bucket: "meshtastic")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "node")
+  |> sort(columns: ["_time"], desc: true)
+  |> keep(columns: ["_from", "short_name", "long_name"])
+  |> distinct(column: "_from")
+  |> group(columns: ["_from"])
+  |> yield(name: "nodes")
+```
+
+Example #2:
+
+```
+from(bucket: "meshtastic")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "node")
+  |> group(columns: ["_measurement", "_field", "_from"])
+  |> pivot(columnKey: ["_field"], rowKey: ["_time", "_from", "short_name", "long_name"], valueColumn: "_value")
+  |> drop(columns: ["_start", "_stop"])
+  |> last(column: "_time")
+  |> yield(name: "nodes")
+```
