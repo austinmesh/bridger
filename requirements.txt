@@ -15,6 +15,8 @@ charset-normalizer==3.3.2
     # via requests
 dataclasses-json==0.6.7
     # via -r requirements.in
+dbus-fast==2.22.1
+    # via bleak
 dotmap==1.3.30
     # via meshtastic
 idna==3.7
@@ -45,18 +47,6 @@ protobuf==5.27.2
     #   meshtastic
 ptyprocess==0.7.0
     # via pexpect
-pyobjc-core==9.2
-    # via
-    #   bleak
-    #   pyobjc-framework-cocoa
-    #   pyobjc-framework-corebluetooth
-    #   pyobjc-framework-libdispatch
-pyobjc-framework-cocoa==9.2
-    # via pyobjc-framework-corebluetooth
-pyobjc-framework-corebluetooth==9.2
-    # via bleak
-pyobjc-framework-libdispatch==9.2
-    # via bleak
 pyparsing==3.1.2
     # via meshtastic
 pypubsub==4.0.3
