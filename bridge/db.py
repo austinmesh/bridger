@@ -83,7 +83,7 @@ def write_point(telemetry_data: TelemetryPoint):
     common_fields = ["rx_time", "rx_snr", "rx_rssi", "hop_limit", "hop_start"]
     common_tags = ["channel_id", "gateway_id", "_from", "to"]
 
-    def write_data(record, record_measurement_name, record_field_keys, record_tag_keys):
+    def write_data(record: TelemetryPoint, record_measurement_name, record_field_keys, record_tag_keys):
         try:
             extra = {
                 "measurement": record_measurement_name,
@@ -102,7 +102,7 @@ def write_point(telemetry_data: TelemetryPoint):
                 record_field_keys=record_field_keys + common_fields,
                 record_tag_keys=record_tag_keys + common_tags,
             )
-            logger.bind(**extra).info(f"Data written to InfluxDB: {record}")
+            logger.bind(**extra).info(f"Wrote data from gateway: {record.gateway_id}")
         except ApiException as e:
             if e.status == 401:
                 logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
