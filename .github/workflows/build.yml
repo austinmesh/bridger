@@ -12,9 +12,40 @@ on:
 
 
 jobs:
-  test:
-    runs-on: self-hosted
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.7
 
+      - name: Set up Python
+        uses: actions/setup-python@v5.1.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run isort
+        uses: isort/isort-action@v1.1.0
+        id: isort
+        with:
+          configuration: --check-only --diff -l 125 --verbose
+
+      - name: isort summary
+        env:
+          ISORT_SUMMARY: ${{ steps.isort.outputs.isort-result }}
+        run: |
+          echo "\`\`\`python" >> $GITHUB_STEP_SUMMARY
+          echo "$ISORT_SUMMARY" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run black
+        uses: psf/black@24.4.2
+        with:
+          options: "-l 125 --check --diff --verbose"
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.1.7
 
@@ -85,6 +116,7 @@ jobs:
     needs:
       - build
       - test
+      - linting
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4.1.7
