@@ -12,10 +12,10 @@ Copy the the `.env.default` file to `.env` and view for the environment variable
  - MQTT_BROKER
  - MQTT_USER
  - MQTT_PASS
- - INFLUX_BUCKET
- - INFLUX_ORG
- - INFLUX_TOKEN
- - INFLUX_URL
+ - INFLUXDB_V2_BUCKET
+ - INFLUXDB_V2_ORG
+ - INFLUXDB_V2_TOKEN
+ - INFLUXDB_V2_URL
 
 Then install the required packages in a Python virtual environment:
 

@@ -12,6 +12,23 @@ on:
 
 
 jobs:
+  test:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Test with pytest
+        run: pytest --cov bridge
+
   build:
     runs-on: self-hosted
 

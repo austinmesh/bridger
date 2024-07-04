@@ -74,3 +74,12 @@ from(bucket: "meshtastic")
   |> last(column: "_time")
   |> yield(name: "nodes")
 ```
+
+
+## Commands
+
+Updating requirements.txt
+
+```bash
+pri -v $PWD:/bridger -w /bridger docker.io/library/python:3.12 bash -c "pip install pip-tools; pip-compile --strip-extras"
+```

@@ -4,5 +4,7 @@ loguru
 meshtastic
 paho-mqtt
 protobuf
+pytest
+pytest-cov
 python-dotenv
 sentry-sdk
