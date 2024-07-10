@@ -12,21 +12,14 @@ from bridge.db import PositionPoint
 from bridge.mesh import PacketProcessorError, PBPacketProcessor
 
 # Example base64 encoded MQTT messages
-node_info1 = base64.b64decode(
-    b"Cj4NZNgWDBX/////IicIBBIhCgkhMGMxNmQ4NjQSBEdFS08aBPCfpo4iBtzaDBbYZCgfGAE125PbNkgFWAp4BRIITG9uZ0Zhc3QaCSEwYzE2ZDg2NA=="
-)
-node_info2 = base64.b64decode(
-    b"CmAN8w/QhBVk2BYMIjsIBBIyCgkhODRkMDBmZjMSE+KYgO+4j1NPTDMgUmVsYXkgVjIa"
-    b"BFNPTDMiBsPThNAP8ygJOAM125PbNjUC6MYyRQAAkEBIAmDX//////////8BeAISCExvb"
-    b"mdGYXN0GgkhMGMxNmQ4NjQ="
-)
-device_telemetry1 = base64.b64decode(
-    b"CjANZNgWDBX/////IhkIQxIVDTIAAAASDghlHU8bxEAl9dyRPCgyNdyT2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ="
-)
-position1 = base64.b64decode(b"CioNZNgWDBX/////IhMIAxINDQDADBIVAMDCxbgBERgBNd+T2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")
-position2 = base64.b64decode(
-    b"CkAN8w/QhBVk2BYMIhsIAxISDQAADRIVAADDxSXUEYZmuAEPNd+T2zY1A+jGMkUAALhASAJg1f//////////AXgCEghMb25nRmFzdBoJITBjMTZkODY0"
-)
+# fmt: off
+node_info1 = base64.b64decode(b"Cj4NZNgWDBX/////IicIBBIhCgkhMGMxNmQ4NjQSBEdFS08aBPCfpo4iBtzaDBbYZCgfGAE125PbNkgFWAp4BRIITG9uZ0Zhc3QaCSEwYzE2ZDg2NA==")  # noqa: E501
+node_info2 = base64.b64decode(b"CmAN8w/QhBVk2BYMIjsIBBIyCgkhODRkMDBmZjMSE+KYgO+4j1NPTDMgUmVsYXkgVjIaBFNPTDMiBsPThNAP8ygJOAM125PbNjUC6MYyRQAAkEBIAmDX//////////8BeAISCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
+device_telemetry1 = base64.b64decode(b"CjANZNgWDBX/////IhkIQxIVDTIAAAASDghlHU8bxEAl9dyRPCgyNdyT2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
+position1 = base64.b64decode(b"CioNZNgWDBX/////IhMIAxINDQDADBIVAMDCxbgBERgBNd+T2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
+position2 = base64.b64decode(b"CkAN8w/QhBVk2BYMIhsIAxISDQAADRIVAADDxSXUEYZmuAEPNd+T2zY1A+jGMkUAALhASAJg1f//////////AXgCEghMb25nRmFzdBoJITBjMTZkODY0")  # noqa: E501
+neighbor1 = base64.b64decode(b"CmENuoSLahX/////IkcIRxJDCLqJrtQGELqJrtQGGIQHIgsIhome5wgVAADAQCILCN6vs+wLFQAAMMEiCwi/w4qUBxUAAIDBIgsIqIjKqgUVAAB8wTWcQz5MPW5/hWZIBHgEEghMb25nRmFzdBoJITZhOGI4NGJh")  # noqa: E501
+# fmt: on
 
 
 @pytest.fixture
@@ -37,6 +30,12 @@ def influx_client():
 @pytest.fixture
 def service_envelope():
     envelope = ServiceEnvelope.FromString(position1)
+    return envelope
+
+
+@pytest.fixture
+def neighbor_envelope():
+    envelope = ServiceEnvelope.FromString(neighbor1)
     return envelope
 
 
@@ -90,6 +89,13 @@ class TestPBPacketProcessor:
             telemetry_data = processor.data
             processor.write_point(telemetry_data)
             assert mock_write_api().write.called
+
+    def test_write_nieghbor_point(self, influx_client: MagicMock, neighbor_envelope: ServiceEnvelope):
+        with patch.object(influx_client, "write_api", return_value=MagicMock()) as mock_write_api:
+            processor = PBPacketProcessor(influx_client, neighbor_envelope)
+            telemetry_data = processor.data
+            processor.write_point(telemetry_data)
+            assert mock_write_api().write
 
     def test_write_point_api_exception(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
         payload_dict = {

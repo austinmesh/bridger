@@ -68,3 +68,13 @@ class PositionPoint(TelemetryPoint):
     altitude: Optional[int] = None
     PDOP: Optional[int] = None
     sats_in_view: Optional[int] = None
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
+class NeighborInfoPacket(TelemetryPoint):
+    node_id: int
+    last_sent_by_id: int
+    node_broadcast_interval_secs: int
+    neighbor_id: int
+    snr: float

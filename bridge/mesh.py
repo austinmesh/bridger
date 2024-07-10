@@ -9,12 +9,19 @@ from google.protobuf.message import DecodeError
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
-from meshtastic.protobuf.mesh_pb2 import Position, User
+from meshtastic.protobuf.mesh_pb2 import NeighborInfo, Position, User
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
-from bridge.db import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint, TelemetryPoint
+from bridge.db import (
+    DeviceTelemetryPoint,
+    NeighborInfoPacket,
+    NodeInfoPoint,
+    PositionPoint,
+    SensorTelemetryPoint,
+    TelemetryPoint,
+)
 from bridge.log import file_logger, logger
 
 INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
@@ -23,14 +30,8 @@ DECODERS = {
     PortNum.NODEINFO_APP: User,
     PortNum.POSITION_APP: Position,
     PortNum.TELEMETRY_APP: Telemetry,
+    PortNum.NEIGHBORINFO_APP: NeighborInfo,
 }
-
-# DECODER_DATA_MAPPING = {
-#     NodeInfoPoint: PortNum.NODEINFO_APP,
-#     PositionPoint: PortNum.POSITION_APP,
-#     SensorTelemetryPoint: PortNum.TELEMETRY_APP,
-#     DeviceTelemetryPoint: PortNum.TELEMETRY_APP,
-# }
 
 
 class PacketProcessorError(Exception):
@@ -77,6 +78,12 @@ class PacketProcessor(ABC):
             ["battery_level", "voltage", "air_util_tx", "channel_utilization"],
             PortNum.TELEMETRY_APP,
         ),
+        NeighborInfoPacket: (
+            "neighbor",
+            ["neighbor_id", "node_id", "last_sent_by_id"],
+            ["snr", "node_broadcast_interval_secs"],
+            PortNum.NEIGHBORINFO_APP,
+        ),
     }
 
     @property
@@ -107,16 +114,27 @@ class PacketProcessor(ABC):
                 record_field_keys=fields + self.common_fields,
                 record_tag_keys=tags + self.common_tags,
             )
-            logger.bind(**extra).opt(colors=True).info(
-                f"Wrote packet ID <yellow>{record.packet_id}</yellow> from gateway: {record.gateway_id}"
-            )
+
+            if isinstance(record, list):
+                logger.bind(**extra).opt(colors=True).info(
+                    f"Wrote {len(record)} {measurement} packets from gateway: {record[0].gateway_id}"
+                )
+            else:
+                logger.bind(**extra).opt(colors=True).info(
+                    f"Wrote {measurement} packet <yellow>{record.packet_id}</yellow> from gateway: {record.gateway_id}"
+                )
         except ApiException as e:
             if e.status == 401:
                 logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
 
-    def write_point(self, telemetry_data: TelemetryPoint):
+    def write_point(self, telemetry_data: Union[TelemetryPoint, list[TelemetryPoint]]):
         for telemetry_class, (measurement, tags, fields, port_num) in self.measurement_data.items():
             if isinstance(telemetry_data, telemetry_class):
+                self.write_data(telemetry_data, measurement, fields, tags)
+                break
+
+            # The InfluxDB write API can take a list of points
+            if isinstance(telemetry_data, list) and isinstance(telemetry_data[0], telemetry_class):
                 self.write_data(telemetry_data, measurement, fields, tags)
                 break
 
@@ -179,6 +197,21 @@ class PBPacketProcessor(PacketProcessor):
                 elif "device_metrics" in self.payload_as_dict:
                     point_data.update(self.payload_as_dict["device_metrics"])
                     return DeviceTelemetryPoint(**point_data)
+            elif self.portnum == PortNum.NEIGHBORINFO_APP:
+                neighbors = [
+                    {"neighbor_id": neighbor["node_id"], "snr": neighbor["snr"]} for neighbor in point_data["neighbors"]
+                ]
+
+                neighbor_points = []
+                point_data.pop("neighbors")
+
+                for neighbor in neighbors:
+                    point_data["neighbor_id"] = neighbor["neighbor_id"]
+                    point_data["snr"] = neighbor["snr"]
+                    neighbor_points.append(NeighborInfoPacket(**point_data))
+
+                return neighbor_points
+
             else:
                 logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
                 logger.debug(f"Payload: {self.payload_as_dict}")
