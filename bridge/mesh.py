@@ -145,7 +145,7 @@ class PacketProcessor(ABC):
 
 
 class PBPacketProcessor(PacketProcessor):
-    def __init__(self, influx_client: InfluxDBClient, service_envelope: ServiceEnvelope):
+    def __init__(self, influx_client: InfluxDBClient, service_envelope: ServiceEnvelope, force_decode=False):
         super().__init__(influx_client, service_envelope)
 
         # Throw exception if service envelope is a type not in the DECODERS dict
@@ -156,6 +156,7 @@ class PBPacketProcessor(PacketProcessor):
                 portnum=self.portnum,
             )
 
+        self.force_decode = force_decode
         self.payload = DECODERS[self.portnum].FromString(service_envelope.packet.decoded.payload)
 
     @property
@@ -183,13 +184,17 @@ class PBPacketProcessor(PacketProcessor):
         }
 
         point_data.update(self.payload_as_dict)
+        logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 
         try:
             if self.portnum == PortNum.NODEINFO_APP:
                 return NodeInfoPoint(**point_data)
             elif self.portnum == PortNum.POSITION_APP:
-                if "latitude_i" in self.payload_as_dict and "longitude_i" in self.payload_as_dict:
+                if ("latitude_i" in self.payload_as_dict and "longitude_i" in self.payload_as_dict) or self.force_decode:
                     return PositionPoint(**point_data)
+                else:
+                    logger.bind(**self.payload_as_dict).debug("Latitude and longitude not found in payload")
+                    return None
             elif self.portnum == PortNum.TELEMETRY_APP:
                 if "environment_metrics" in self.payload_as_dict:
                     point_data.update(self.payload_as_dict["environment_metrics"])
@@ -199,15 +204,19 @@ class PBPacketProcessor(PacketProcessor):
                     return DeviceTelemetryPoint(**point_data)
             elif self.portnum == PortNum.NEIGHBORINFO_APP:
                 neighbors = [
-                    {"neighbor_id": neighbor["node_id"], "snr": neighbor["snr"]} for neighbor in point_data["neighbors"]
+                    {"neighbor_id": neighbor.get("node_id", None), "snr": neighbor.get("snr", None)}
+                    for neighbor in point_data["neighbors"]
                 ]
 
                 neighbor_points = []
                 point_data.pop("neighbors")
 
                 for neighbor in neighbors:
-                    point_data["neighbor_id"] = neighbor["neighbor_id"]
-                    point_data["snr"] = neighbor["snr"]
+                    point_data["neighbor_id"] = neighbor.get("neighbor_id")
+
+                    if neighbor.get("snr"):
+                        point_data["snr"] = neighbor.get("snr")
+
                     neighbor_points.append(NeighborInfoPacket(**point_data))
 
                 return neighbor_points
@@ -232,8 +241,9 @@ if __name__ == "__main__":
         service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
         logger.info(f"Service envelope: \n{service_envelope}")
 
-        processor = PBPacketProcessor(influx_client, service_envelope)
-        logger.info(f"Decoded packet: \n{processor.data}")
+        processor = PBPacketProcessor(influx_client, service_envelope, force_decode=True)
+        logger.info(f"Decoded packet: \n{processor.payload_as_dict}")
+        logger.info(f"Data: {processor.data}")
 
     except PacketProcessorError as e:
         logger.warning(f"Error processing packet: {e}")
