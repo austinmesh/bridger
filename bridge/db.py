@@ -75,6 +75,6 @@ class PositionPoint(TelemetryPoint):
 class NeighborInfoPacket(TelemetryPoint):
     node_id: int
     last_sent_by_id: int
-    node_broadcast_interval_secs: int
     neighbor_id: int
+    node_broadcast_interval_secs: Optional[int] = None
     snr: Optional[float] = None
