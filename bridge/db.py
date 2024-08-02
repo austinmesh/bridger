@@ -63,7 +63,7 @@ class NodeInfoPoint(TelemetryPoint):
 class PositionPoint(TelemetryPoint):
     latitude_i: int
     longitude_i: int
-    time: Optional[str] = None
+    gps_time: Optional[str] = None
     precision_bits: Optional[int] = None
     altitude: Optional[int] = None
     PDOP: Optional[int] = None

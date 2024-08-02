@@ -191,6 +191,10 @@ class PBPacketProcessor(PacketProcessor):
                 return NodeInfoPoint(**point_data)
             elif self.portnum == PortNum.POSITION_APP:
                 if ("latitude_i" in self.payload_as_dict and "longitude_i" in self.payload_as_dict) or self.force_decode:
+                    # The GPS time field ends up being used by InfluxDB as the record time so we need to rename it
+                    if point_data.get("time"):
+                        point_data["gps_time"] = point_data.pop("time", None)
+
                     return PositionPoint(**point_data)
                 else:
                     logger.bind(**self.payload_as_dict).debug("Latitude and longitude not found in payload")
