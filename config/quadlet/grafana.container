@@ -1,5 +1,5 @@
 [Container]
-Image = docker.io/grafana/grafana-oss:main
+Image = docker.io/grafana/grafana-oss:11.1.3
 PublishPort = 3000:3000
 Volume = grafana-storage.volume:/var/lib/grafana
 Environment = GF_AUTH_ANONYMOUS_ENABLED=true

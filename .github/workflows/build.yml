@@ -86,6 +86,7 @@ jobs:
             BRANCH_NAME=${GITHUB_REF}
           fi
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
       - name: Set image tags
         id: set_tags
@@ -103,6 +104,8 @@ jobs:
           platforms: linux/amd64
           tags: ${{ steps.set_tags.outputs.tags }}
           containerfiles: ./Containerfile
+          build-args: |
+            release=bridger@${{ steps.extract_branch.outputs.branch_name }}
 
       - name: Push image
         uses: redhat-actions/push-to-registry@v2
