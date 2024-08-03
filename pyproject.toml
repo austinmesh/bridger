@@ -1,0 +1,44 @@
+[build-system]
+requires = [
+    "setuptools",
+    "setuptools-scm",
+]
+
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bridger"
+dynamic = ["version"]
+description = "A bridge between MQTT and InfluxDB for Meshtastic metrics"
+readme = "README.md"
+
+authors = [
+    { name="Andy Shinn", email="andys@andyshinn.as" },
+]
+
+dependencies = [
+    "dataclasses-json",
+    "influxdb-client",
+    "loguru",
+    "meshtastic",
+    "paho-mqtt",
+    "protobuf",
+    "pytest",
+    "pytest-cov",
+    "python-dotenv",
+    "sentry-sdk",
+]
+
+[project.urls]
+Source = "https://github.com/austinmesh/bridger"
+Graphs = "https://graphs.austinmesh.org"
+
+[tool.black]
+line-length = 125
+
+[tool.isort]
+profile = "black"
+line_length = 125
+
+[tool.setuptools]
+py-modules = []
