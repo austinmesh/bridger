@@ -58,7 +58,12 @@ class BridgerMQTT(Client):
 
             pb_processor = PBPacketProcessor(self.influx_client, service_envelope)
             set_user({"id": getattr(service_envelope.packet, "from")})
-            pb_processor.write_point(pb_processor.data)
+
+            if pb_processor.data:
+                logger.bind(envelope_id=packet_id).debug(f"Trying to write data: {pb_processor.data}")
+                pb_processor.write_point(pb_processor.data)
+            else:
+                logger.bind(envelope_id=packet_id).debug("No data to write")
 
         except DecodeError as e:
             self._handle_decode_error(e, breadcrumb_data, message.payload)

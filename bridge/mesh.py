@@ -209,8 +209,12 @@ class PBPacketProcessor(PacketProcessor):
             elif self.portnum == PortNum.NEIGHBORINFO_APP:
                 neighbors = [
                     {"neighbor_id": neighbor.get("node_id", None), "snr": neighbor.get("snr", None)}
-                    for neighbor in point_data["neighbors"]
+                    for neighbor in point_data.get("neighbors", [])
                 ]
+
+                if not neighbors:
+                    logger.bind(**point_data).debug("No neighbors found in payload")
+                    return None
 
                 neighbor_points = []
                 point_data.pop("neighbors")
