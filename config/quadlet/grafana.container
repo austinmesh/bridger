@@ -7,6 +7,8 @@ Environment = GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
 Environment = GF_AUTH_ANONYMOUS_ORG_NAME="Austin Mesh"
 Environment = GF_AUTH_ANONYMOUS_HIDE_VERSION=true
 Environment = GF_SECURITY_ALLOW_EMBEDDING=true
+Environment = GF_SERVER_DOMAIN=graphs.austinmesh.org
+Environment = GF_SERVER_PROTOCOL=https
 Network = bridger.network
 
 [Service]
