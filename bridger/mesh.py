@@ -14,7 +14,7 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
-from bridge.db import (
+from bridger.db import (
     DeviceTelemetryPoint,
     NeighborInfoPacket,
     NodeInfoPoint,
@@ -22,7 +22,7 @@ from bridge.db import (
     SensorTelemetryPoint,
     TelemetryPoint,
 )
-from bridge.log import file_logger, logger
+from bridger.log import file_logger, logger
 
 INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
 

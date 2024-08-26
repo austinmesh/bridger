@@ -1,6 +1,6 @@
 import pytest
 
-from bridge.db import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint, TelemetryPoint
+from bridger.db import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint, TelemetryPoint
 
 
 @pytest.fixture

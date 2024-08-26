@@ -26,7 +26,7 @@ pip install -r requirements.txt
 And run the script:
 
 ```bash
-python -m bridge
+python -m bridger
 ```
 
 ## Node Setup
