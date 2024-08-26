@@ -1,4 +1,4 @@
-# bridger
+# ![bridger](./logo/logo-wide.png)
 
 Bridger is a Meshtastic MQTT to InfluxDB metrics bridge. It listens to MQTT for protobuf messages and uses those to push metrics to InfluxDB.
 
