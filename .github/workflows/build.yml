@@ -59,7 +59,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Test with pytest
-        run: pytest --cov bridge
+        run: pytest --cov bridger
 
   build:
     runs-on: self-hosted

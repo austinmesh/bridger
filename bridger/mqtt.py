@@ -8,8 +8,8 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 
-from bridge.log import logger
-from bridge.mesh import PacketProcessorError, PBPacketProcessor
+from bridger.log import logger
+from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "egr/home/2/e/#")
 

@@ -8,8 +8,8 @@ from meshtastic.protobuf.mesh_pb2 import Position
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 
-from bridge.db import PositionPoint
-from bridge.mesh import PacketProcessorError, PBPacketProcessor
+from bridger.db import PositionPoint
+from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
 # Example base64 encoded MQTT messages
 # fmt: off

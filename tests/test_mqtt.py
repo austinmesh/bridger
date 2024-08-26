@@ -7,8 +7,8 @@ from influxdb_client import InfluxDBClient
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import CallbackAPIVersion, MQTTMessage
 
-from bridge.mesh import PBPacketProcessor
-from bridge.mqtt import BridgerMQTT
+from bridger.mesh import PBPacketProcessor
+from bridger.mqtt import BridgerMQTT
 
 
 @pytest.fixture

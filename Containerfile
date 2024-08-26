@@ -5,4 +5,4 @@ COPY requirements.txt /app/requirements.txt
 RUN --mount=type=cache,target=/root/.pip pip install -r requirements.txt
 COPY . /app
 ENV SENTRY_RELEASE=$release
-CMD ["python", "-m", "bridge"]
+CMD ["python", "-m", "bridger"]
