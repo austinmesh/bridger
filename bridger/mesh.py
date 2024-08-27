@@ -41,7 +41,7 @@ class PacketProcessorError(Exception):
 
 
 class PacketProcessor(ABC):
-    common_fields = ["rx_time", "rx_snr", "rx_rssi", "hop_limit", "hop_start"]
+    common_fields = ["rx_time", "rx_snr", "rx_rssi", "hop_limit", "hop_start", "packet_id"]
     common_tags = ["channel_id", "gateway_id", "_from", "to"]
 
     def __init__(self, influx_client: InfluxDBClient, service_envelope: ServiceEnvelope):
