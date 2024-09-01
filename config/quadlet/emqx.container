@@ -1,6 +1,6 @@
 [Container]
 HostName = emqx
-Image = docker.io/emqx/emqx:5.1.6
+Image = docker.io/emqx/emqx:5.8.0
 Network = bridger.network
 PublishPort = 1883:1883
 PublishPort = 8083:8083
