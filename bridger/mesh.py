@@ -69,14 +69,13 @@ class PacketProcessor(ABC):
                 "relative_humidity",
                 "temperature",
                 "voltage",
-                "uptime_seconds",
             ],
             PortNum.TELEMETRY_APP,
         ),
         DeviceTelemetryPoint: (
             "battery",
             [],
-            ["battery_level", "voltage", "air_util_tx", "channel_utilization"],
+            ["battery_level", "voltage", "air_util_tx", "channel_utilization", "uptime_seconds"],
             PortNum.TELEMETRY_APP,
         ),
         NeighborInfoPacket: (
