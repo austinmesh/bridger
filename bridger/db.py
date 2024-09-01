@@ -55,7 +55,7 @@ class NodeInfoPoint(TelemetryPoint):
     short_name: str
     macaddr: Optional[str] = None
     hw_model: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[int] = None
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
