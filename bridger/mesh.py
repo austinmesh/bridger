@@ -19,6 +19,7 @@ from bridger.db import (
     NeighborInfoPacket,
     NodeInfoPoint,
     PositionPoint,
+    PowerTelemetryPoint,
     SensorTelemetryPoint,
     TelemetryPoint,
 )
@@ -83,6 +84,12 @@ class PacketProcessor(ABC):
             ["neighbor_id", "node_id", "last_sent_by_id"],
             ["snr", "node_broadcast_interval_secs"],
             PortNum.NEIGHBORINFO_APP,
+        ),
+        PowerTelemetryPoint: (
+            "power",
+            ["channel"],
+            ["voltage", "current"],
+            PortNum.TELEMETRY_APP,
         ),
     }
 
@@ -206,6 +213,21 @@ class PBPacketProcessor(PacketProcessor):
                 elif "device_metrics" in self.payload_as_dict:
                     point_data.update(self.payload_as_dict["device_metrics"])
                     return DeviceTelemetryPoint(**point_data)
+                elif "power_metrics" in self.payload_as_dict:
+                    power_metrics = self.payload_as_dict["power_metrics"]
+                    power_points = []
+                    channels = set(key.split("_")[0] for key in power_metrics.keys())
+
+                    for channel in channels:
+                        power_points.append(
+                            PowerTelemetryPoint(
+                                **point_data,
+                                channel=channel,
+                                voltage=power_metrics[f"{channel}_voltage"],
+                                current=power_metrics[f"{channel}_current"],
+                            )
+                        )
+                    return power_points
             elif self.portnum == PortNum.NEIGHBORINFO_APP:
                 neighbors = [
                     {"neighbor_id": neighbor.get("node_id", None), "snr": neighbor.get("snr", None)}

@@ -78,3 +78,11 @@ class NeighborInfoPacket(TelemetryPoint):
     neighbor_id: int
     node_broadcast_interval_secs: Optional[int] = None
     snr: Optional[float] = None
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
+class PowerTelemetryPoint(TelemetryPoint):
+    voltage: Optional[float] = None
+    current: Optional[float] = None
+    channel: Optional[str] = None
