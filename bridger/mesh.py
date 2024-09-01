@@ -50,7 +50,7 @@ class PacketProcessor(ABC):
         self.write_api = influx_client.write_api(write_options=SYNCHRONOUS)
 
     measurement_data = {
-        NodeInfoPoint: ("node", ["long_name", "short_name", "hw_model"], [], PortNum.NODEINFO_APP),
+        NodeInfoPoint: ("node", ["long_name", "short_name", "hw_model", "role"], [], PortNum.NODEINFO_APP),
         PositionPoint: (
             "position",
             [],
