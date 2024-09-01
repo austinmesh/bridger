@@ -1,5 +1,5 @@
 [Container]
-Image = influxdb:2.7.6
+Image = influxdb:2.7.10
 PublishPort = 8086:8086
 Volume = influxdb-data.volume:/var/lib/influxdb2
 Volume = influxdb-config.volume:/etc/influxdb2
