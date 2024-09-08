@@ -17,6 +17,22 @@ Copy the the `.env.default` file to `.env` and view for the environment variable
  - INFLUXDB_V2_TOKEN
  - INFLUXDB_V2_URL
 
+There are some other tunables as well:
+
+ - INFLUXDB_V2_WRITE_PRECISION
+ - MESHTASTIC_API_CACHE_TTL: The time to cache the Meshtastic API data. Defaults to 6 hours.
+ - MESHTASTIC_KEY: The base64 encoded encryption key for the primary channel. Defaults to the the key provided by `AQ==`
+ - MQTT_TEST_CHANNEL
+ - MQTT_TEST_CHANNEL_ID
+ - DISCORD_BOT_TOKEN
+ - DISCORD_BOT_OWNER_ID
+ - BRIDGER_ADMIN_ROLE
+ - EMQX_API_KEY
+ - EMQX_SECRET_KEY
+ - EMQX_URL
+ - LOG_PATH: Set this to a file path to log to a file. Defaults to `logs/bridger.log`
+
+
 Then install the required packages in a Python virtual environment:
 
 ```bash

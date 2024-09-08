@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from bridger.dataclasses import PositionPoint
-from bridger.influx import InfluxWriter
+from bridger.influx.interfaces import InfluxWriter
 
 
 @pytest.fixture

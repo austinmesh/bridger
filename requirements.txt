@@ -13,6 +13,8 @@ aiohttp==3.11.14
     #   bridger (pyproject.toml)
     #   discord-py
     #   pytest-aiohttp
+aiomqtt==2.3.0
+    # via bridger (pyproject.toml)
 aiosignal==1.3.2
     # via aiohttp
 arrow==1.3.0
@@ -70,7 +72,9 @@ packaging==24.2
     #   meshtastic
     #   pytest
 paho-mqtt==2.1.0
-    # via bridger (pyproject.toml)
+    # via
+    #   aiomqtt
+    #   bridger (pyproject.toml)
 pluggy==1.5.0
     # via pytest
 propcache==0.3.1
@@ -130,7 +134,7 @@ typing-extensions==4.13.0
     #   typing-inspect
 typing-inspect==0.9.0
     # via dataclasses-json
-urllib3==2.3.0
+urllib3==2.2.3
     # via
     #   influxdb-client
     #   requests

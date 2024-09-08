@@ -18,6 +18,7 @@ authors = [
 
 dependencies = [
     "aiohttp",
+    "aiomqtt",
     "aiocache",
     "arrow",
     "cryptography",

@@ -3,7 +3,7 @@ from collections import defaultdict
 from aiocache import cached
 from aiohttp import ClientSession
 
-BASE_URL = "https://api.meshtastic.org"
+from bridger.config import MESHTASTIC_API_CACHE_TTL, MESHTASTIC_API_ENDPOINT
 
 
 class DeviceModel:
@@ -12,9 +12,9 @@ class DeviceModel:
     def __init__(self, session: ClientSession = None):
         self.session = session
 
-    @cached(ttl=3600)  # Cache the response for 1 hour
+    @cached(ttl=MESHTASTIC_API_CACHE_TTL)
     async def make_request(self) -> list:
-        async with self.session.get(BASE_URL + self.device_hardware_path) as response:
+        async with self.session.get(MESHTASTIC_API_ENDPOINT + self.device_hardware_path) as response:
             return await response.json()
 
     async def get_models(self, model_id: int = None) -> list:

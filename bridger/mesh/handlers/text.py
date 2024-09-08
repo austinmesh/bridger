@@ -12,6 +12,7 @@ class TextHandler(PacketHandler):
     def handle(self):
         if "text" in self.payload_dict:
             # We are leaving out the actual text property here as we don't want to store actual messages
-            self.base_data.pop("text", None)
+            if self.strip_text:
+                self.base_data.pop("text", None)
             return TextMessagePoint(**self.base_data)
         return None

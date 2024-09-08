@@ -20,6 +20,7 @@ class BridgerBot(commands.Bot):
 
         self.initial_extensions = [
             "bridger.cogs.mqtt",
+            "bridger.cogs.testmsg",
         ]
 
     async def setup_hook(self):

@@ -1,16 +1,9 @@
-import os
-
 from influxdb_client import InfluxDBClient
 from paho.mqtt.client import CallbackAPIVersion
 
+from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_USER
 from bridger.log import logger
 from bridger.mqtt import BridgerMQTT
-
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.1.110")
-MQTT_USER = os.getenv("MQTT_USER", "station")
-MQTT_PASS = os.getenv("MQTT_PASS")
-MQTT_PORT = os.getenv("MQTT_PORT", 1883)
-
 
 if __name__ == "__main__":
     try:

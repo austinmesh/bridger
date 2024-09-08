@@ -1,5 +1,4 @@
 import base64
-import os
 from collections import deque
 
 from google.protobuf.message import DecodeError
@@ -8,11 +7,10 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 
-from bridger.influx import InfluxWriter
+from bridger.config import MQTT_TOPIC
+from bridger.influx.interfaces import InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
-
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "egr/home/2/e/#")
 
 
 class BridgerMQTT(Client):
