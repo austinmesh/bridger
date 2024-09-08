@@ -23,8 +23,9 @@ class PacketProcessorError(Exception):
 
 
 class PacketProcessor(ABC):
-    def __init__(self, service_envelope: ServiceEnvelope):
+    def __init__(self, service_envelope: ServiceEnvelope, strip_text: bool = True):
         self.service_envelope = service_envelope
+        self.strip_text = strip_text
 
     @property
     @abstractmethod
@@ -43,8 +44,9 @@ class PBPacketProcessor(PacketProcessor):
         service_envelope: ServiceEnvelope,
         force_decode=False,
         auto_decrypt=True,
+        **kwargs,
     ):
-        super().__init__(service_envelope)
+        super().__init__(service_envelope, **kwargs)
 
         self.force_decode = force_decode
         self.crypto_engine = CryptoEngine()
@@ -125,7 +127,7 @@ class PBPacketProcessor(PacketProcessor):
 
         try:
             for handler_cls in HANDLER_MAP.get(self.portnum, []):
-                handler = handler_cls(packet, self.payload_dict, point_data)
+                handler = handler_cls(packet, self.payload_dict, point_data, strip_text=self.strip_text)
                 result = handler.handle()
 
                 if result:
