@@ -1,5 +1,15 @@
-# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,venv,direnv,dotenv
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,venv,direnv,dotenv
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,venv,direnv,dotenv,database
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,venv,direnv,dotenv,database
+
+### Database ###
+*.accdb
+*.db
+*.dbf
+*.mdb
+*.pdb
+*.sqlite3
+*.db-shm
+*.db-wal
 
 ### direnv ###
 .direnv
@@ -210,6 +220,4 @@ pip-selfcheck.json
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,venv,direnv,dotenv
-
-*.afdesign~lock~
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,venv,direnv,dotenv,database
