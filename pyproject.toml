@@ -17,6 +17,7 @@ authors = [
 ]
 
 dependencies = [
+    "aiomqtt",
     "cryptography",
     "dataclasses-json",
     "discord.py",
