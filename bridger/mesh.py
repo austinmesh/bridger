@@ -15,7 +15,7 @@ from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
 from bridger.crypto import CryptoEngine
-from bridger.db import (
+from bridger.dataclasses import (
     DeviceTelemetryPoint,
     NeighborInfoPacket,
     NodeInfoPoint,

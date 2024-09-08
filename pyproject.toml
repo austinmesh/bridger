@@ -19,6 +19,7 @@ authors = [
 dependencies = [
     "cryptography",
     "dataclasses-json",
+    "discord.py",
     "influxdb-client",
     "loguru",
     "meshtastic",
@@ -27,6 +28,8 @@ dependencies = [
     "pytest",
     "pytest-cov",
     "python-dotenv",
+    "requests",
+    "requests-mock",
     "sentry-sdk",
 ]
 
@@ -43,3 +46,10 @@ line_length = 125
 
 [tool.setuptools]
 py-modules = []
+
+[tool.pytest.ini_options]
+consider_namespace_packages = true
+addopts = [
+    "--cov=bridger",
+    "--cov-report=term-missing",
+]

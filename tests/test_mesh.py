@@ -9,7 +9,7 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 
 from bridger.crypto import CryptoEngine
-from bridger.db import PositionPoint
+from bridger.dataclasses import PositionPoint
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
 encrypted_key_test = "ujlQw7lG0zMZVjP7gYfs7A=="
