@@ -1,0 +1,64 @@
+{
+  "content": "Message received on **testing** channel from **!fa4cb621**:\n\n> hi Discord",
+  "tts": false,
+  "embeds": [
+    {
+      "id": 10674342,
+      "color": 1616628,
+      "fields": [
+        {
+          "id": 946804213,
+          "name": "SNR",
+          "value": "5.75",
+          "inline": true
+        },
+        {
+          "id": 844664234,
+          "name": "RSSI",
+          "value": "-22",
+          "inline": true
+        },
+        {
+          "id": 320094310,
+          "name": "Time",
+          "value": "1727678237",
+          "inline": true
+        }
+      ],
+      "author": {
+        "name": "!0c18aaf4"
+      }
+    },
+    {
+      "id": 872989849,
+      "color": 146036,
+      "fields": [
+        {
+          "id": 946804213,
+          "name": "SNR",
+          "value": "5.75",
+          "inline": true
+        },
+        {
+          "id": 844664234,
+          "name": "RSSI",
+          "value": "-22",
+          "inline": true
+        },
+        {
+          "id": 320094310,
+          "name": "Time",
+          "value": "1727678237",
+          "inline": true
+        }
+      ],
+      "author": {
+        "name": "!bf23a74"
+      }
+    }
+  ],
+  "components": [],
+  "actions": {},
+  "username": "Bridger",
+  "avatar_url": "https://raw.githubusercontent.com/austinmesh/bridger/refs/heads/main/logo/logo.png"
+}
