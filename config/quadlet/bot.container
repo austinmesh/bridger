@@ -1,0 +1,21 @@
+[Unit]
+StartLimitInterval = 200
+StartLimitBurst = 5
+
+[Container]
+Image = ${IMAGE}
+Exec = python -m bridger.bot
+Environment = INFLUXDB_V2_URL=http://influxdb:8086
+Environment = MQTT_BROKER=emqx
+Environment = LOG_PATH=/var/lib/bridger/logs/bot.log
+EnvironmentFile = /home/andy/.config/bridger.env
+Network = bridger.network
+HostName = bot
+Volume = bridger-data.volume:/var/lib/bridger
+
+[Install]
+WantedBy = default.target
+
+[Service]
+Restart = always
+RestartSec = 30
