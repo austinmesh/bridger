@@ -9,11 +9,12 @@ from google.protobuf.message import DecodeError
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
-from meshtastic.protobuf.mesh_pb2 import NeighborInfo, Position, User
+from meshtastic.protobuf.mesh_pb2 import Data, NeighborInfo, Position, User
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
+from bridger.crypto import CryptoEngine
 from bridger.db import (
     DeviceTelemetryPoint,
     NeighborInfoPacket,
@@ -151,19 +152,15 @@ class PacketProcessor(ABC):
 
 
 class PBPacketProcessor(PacketProcessor):
-    def __init__(self, influx_client: InfluxDBClient, service_envelope: ServiceEnvelope, force_decode=False):
+    def __init__(
+        self, influx_client: InfluxDBClient, service_envelope: ServiceEnvelope, force_decode=False, auto_decrypt=True
+    ):
         super().__init__(influx_client, service_envelope)
 
-        # Throw exception if service envelope is a type not in the DECODERS dict
-        self.portnum: PortNum = service_envelope.packet.decoded.portnum
-        if self.portnum not in DECODERS:
-            raise PacketProcessorError(
-                f"We cannot yet decode: {PortNum.Name(self.portnum)}",
-                portnum=self.portnum,
-            )
+        self.crypto_engine = CryptoEngine()
 
-        self.force_decode = force_decode
-        self.payload = DECODERS[self.portnum].FromString(service_envelope.packet.decoded.payload)
+        if auto_decrypt and self.encrypted:
+            self.decrypt()
 
     @property
     def payload_as_dict(self):
@@ -172,6 +169,24 @@ class PBPacketProcessor(PacketProcessor):
             preserving_proto_field_name=True,
             use_integers_for_enums=True,
         )
+
+    @property
+    def portnum(self):
+        return self.service_envelope.packet.decoded.portnum
+
+    @property
+    def payload(self):
+        if self.portnum not in DECODERS:
+            raise PacketProcessorError(
+                f"We cannot yet decode: {PortNum.Name(self.portnum)}",
+                portnum=self.portnum,
+            )
+
+        return DECODERS[self.portnum].FromString(self.service_envelope.packet.decoded.payload)
+
+    @property
+    def encrypted(self) -> bool:
+        return self.service_envelope.packet.encrypted != b""
 
     @property
     def data(self) -> Optional[Union[NodeInfoPoint, PositionPoint, SensorTelemetryPoint, DeviceTelemetryPoint]]:
@@ -257,6 +272,27 @@ class PBPacketProcessor(PacketProcessor):
         except (AttributeError, KeyError) as e:
             logger.exception(f"{type(e).__name__}: {e}")
             return None
+
+    def decrypt(self) -> bool:
+        if not self.encrypted:
+            return False
+
+        encrypted_data = self.service_envelope.packet.encrypted
+        decrypted_data = self.crypto_engine.decrypt(
+            getattr(self.service_envelope.packet, "from"),
+            self.service_envelope.packet.id,
+            encrypted_data,
+        )
+
+        try:
+            data = Data()
+            data.ParseFromString(decrypted_data)
+            self.service_envelope.packet.decoded.CopyFrom(data)
+        except DecodeError as e:
+            logger.exception(f"Error decrypting message: {e}")
+            raise PacketProcessorError(f"Error decrypting message: {e}")
+
+        return True
 
 
 if __name__ == "__main__":

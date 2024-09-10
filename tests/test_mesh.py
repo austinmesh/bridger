@@ -11,6 +11,8 @@ from meshtastic.protobuf.portnums_pb2 import PortNum
 from bridger.db import PositionPoint
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
+encrypted_key_test = "ujlQw7lG0zMZVjP7gYfs7A=="
+
 # Example base64 encoded MQTT messages
 # fmt: off
 node_info1 = base64.b64decode(b"Cj4NZNgWDBX/////IicIBBIhCgkhMGMxNmQ4NjQSBEdFS08aBPCfpo4iBtzaDBbYZCgfGAE125PbNkgFWAp4BRIITG9uZ0Zhc3QaCSEwYzE2ZDg2NA==")  # noqa: E501
@@ -19,6 +21,8 @@ device_telemetry1 = base64.b64decode(b"CjANZNgWDBX/////IhkIQxIVDTIAAAASDghlHU8bx
 position1 = base64.b64decode(b"CioNZNgWDBX/////IhMIAxINDQDADBIVAMDCxbgBERgBNd+T2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
 position2 = base64.b64decode(b"CkAN8w/QhBVk2BYMIhsIAxISDQAADRIVAADDxSXUEYZmuAEPNd+T2zY1A+jGMkUAALhASAJg1f//////////AXgCEghMb25nRmFzdBoJITBjMTZkODY0")  # noqa: E501
 neighbor1 = base64.b64decode(b"CmENuoSLahX/////IkcIRxJDCLqJrtQGELqJrtQGGIQHIgsIhome5wgVAADAQCILCN6vs+wLFQAAMMEiCwi/w4qUBxUAAIDBIgsIqIjKqgUVAAB8wTWcQz5MPW5/hWZIBHgEEghMb25nRmFzdBoJITZhOGI4NGJh")  # noqa: E501
+node_info_encrypted = base64.b64decode(b"CjAN8w/QhBVk2BYMIjsIBBIyCgkhODRkMDBmZjMSE+KYgO+4j1NPTDMgUmVsYXkgVjIaBFNPTDMiBsPThNAP8ygJOAM125PbNjUC6MYyRQAAkEBIAmDX//////////8BeAISCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
+power_packet_encrypted1 = base64.b64decode(b"CjMN9KoYDBX/////GAgqFY3Y05LhKIBqMwjwGuGN5o6s3xa8wjXB1YJfPcDN32ZIA1gKeAMSCExvbmdGYXN0GgkhMGMxOGFhZjQ=")  # noqa: E501
 # fmt: on
 
 
@@ -50,7 +54,8 @@ class TestPBPacketProcessor:
         modified_envelope = ServiceEnvelope.FromString(node_info2)
         modified_envelope.packet.decoded.portnum = 6  # Admin portnum that we don't use
         with pytest.raises(PacketProcessorError):
-            PBPacketProcessor(influx_client, modified_envelope)
+            processor = PBPacketProcessor(influx_client, modified_envelope)
+            processor.payload
 
     def test_payload_as_dict(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
         with patch.object(Position, "FromString", return_value=MagicMock()):

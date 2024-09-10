@@ -17,6 +17,7 @@ authors = [
 ]
 
 dependencies = [
+    "cryptography",
     "dataclasses-json",
     "influxdb-client",
     "loguru",
