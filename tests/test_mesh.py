@@ -8,6 +8,7 @@ from meshtastic.protobuf.mesh_pb2 import Position
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 
+from bridger.crypto import CryptoEngine
 from bridger.db import PositionPoint
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
@@ -21,7 +22,7 @@ device_telemetry1 = base64.b64decode(b"CjANZNgWDBX/////IhkIQxIVDTIAAAASDghlHU8bx
 position1 = base64.b64decode(b"CioNZNgWDBX/////IhMIAxINDQDADBIVAMDCxbgBERgBNd+T2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
 position2 = base64.b64decode(b"CkAN8w/QhBVk2BYMIhsIAxISDQAADRIVAADDxSXUEYZmuAEPNd+T2zY1A+jGMkUAALhASAJg1f//////////AXgCEghMb25nRmFzdBoJITBjMTZkODY0")  # noqa: E501
 neighbor1 = base64.b64decode(b"CmENuoSLahX/////IkcIRxJDCLqJrtQGELqJrtQGGIQHIgsIhome5wgVAADAQCILCN6vs+wLFQAAMMEiCwi/w4qUBxUAAIDBIgsIqIjKqgUVAAB8wTWcQz5MPW5/hWZIBHgEEghMb25nRmFzdBoJITZhOGI4NGJh")  # noqa: E501
-node_info_encrypted = base64.b64decode(b"CjAN8w/QhBVk2BYMIjsIBBIyCgkhODRkMDBmZjMSE+KYgO+4j1NPTDMgUmVsYXkgVjIaBFNPTDMiBsPThNAP8ygJOAM125PbNjUC6MYyRQAAkEBIAmDX//////////8BeAISCExvbmdGYXN0GgkhMGMxNmQ4NjQ=")  # noqa: E501
+node_info_encrypted = base64.b64decode(b"ClwN1bNHIBX/////GAgqMCjSKlNzvvW8rDUZjO5/jPMTm0NYltWLHRCbCDiPCP2nhV+/e6RjVuGMa5eBmNhm8zVpxh+dPbmG4GZFAADIQEgDYOX//////////wF4AxIITG9uZ0Zhc3QaCSEwYzE4YWFmNA==")  # noqa: E501
 power_packet_encrypted1 = base64.b64decode(b"CjMN9KoYDBX/////GAgqFY3Y05LhKIBqMwjwGuGN5o6s3xa8wjXB1YJfPcDN32ZIA1gKeAMSCExvbmdGYXN0GgkhMGMxOGFhZjQ=")  # noqa: E501
 # fmt: on
 
@@ -29,6 +30,12 @@ power_packet_encrypted1 = base64.b64decode(b"CjMN9KoYDBX/////GAgqFY3Y05LhKIBqMwj
 @pytest.fixture
 def influx_client():
     return MagicMock(spec=InfluxDBClient)
+
+
+@pytest.fixture
+def crypto_engine():
+    # return CryptoEngine(key_base64=encrypted_key_test)
+    return MagicMock(spec=CryptoEngine)
 
 
 @pytest.fixture
@@ -40,6 +47,12 @@ def service_envelope():
 @pytest.fixture
 def neighbor_envelope():
     envelope = ServiceEnvelope.FromString(neighbor1)
+    return envelope
+
+
+@pytest.fixture
+def nodeinfo_encrypted():
+    envelope = ServiceEnvelope.FromString(node_info_encrypted)
     return envelope
 
 
@@ -120,3 +133,49 @@ class TestPBPacketProcessor:
             telemetry_data = processor.data
             processor.write_point(telemetry_data)
             assert mock_write_api().write.called
+
+    @patch("bridger.mesh.CryptoEngine.decrypt", MagicMock())
+    def test_decrypt_node_info_encrypted(self, nodeinfo_encrypted: ServiceEnvelope, influx_client: MagicMock):
+        expected_data = {
+            "_from": 541570005,
+            "to": 4294967295,
+            "packet_id": 2636105321,
+            "rx_time": 1725990585,
+            "rx_snr": 6.25,
+            "rx_rssi": -27,
+            "hop_limit": 3,
+            "hop_start": 3,
+            "channel_id": "LongFast",
+            "gateway_id": "!0c18aaf4",
+            "id": "!2047b3d5",
+            "long_name": "egrme.sh Palm",
+            "short_name": "egrp",
+            "macaddr": "1kEgR7PV",
+            "hw_model": 9,
+            "role": 1,
+        }
+
+        CryptoEngine.decrypt.return_value = (
+            b'\x08\x04\x12,\n\t!2047b3d5\x12\regrme.sh Palm\x1a\x04egrp"\x06\xd6A G\xb3\xd5(\t8\x01'  # noqa: E501
+        )
+
+        processor = PBPacketProcessor(influx_client, nodeinfo_encrypted, auto_decrypt=True)
+
+        decrypted_data = processor.data
+
+        assert decrypted_data._from == expected_data["_from"]
+        assert decrypted_data.to == expected_data["to"]
+        assert decrypted_data.packet_id == expected_data["packet_id"]
+        assert decrypted_data.rx_time == expected_data["rx_time"]
+        assert decrypted_data.rx_snr == expected_data["rx_snr"]
+        assert decrypted_data.rx_rssi == expected_data["rx_rssi"]
+        assert decrypted_data.hop_limit == expected_data["hop_limit"]
+        assert decrypted_data.hop_start == expected_data["hop_start"]
+        assert decrypted_data.channel_id == expected_data["channel_id"]
+        assert decrypted_data.gateway_id == expected_data["gateway_id"]
+        assert decrypted_data.id == expected_data["id"]
+        assert decrypted_data.long_name == expected_data["long_name"]
+        assert decrypted_data.short_name == expected_data["short_name"]
+        assert decrypted_data.macaddr == expected_data["macaddr"]
+        assert decrypted_data.hw_model == expected_data["hw_model"]
+        assert decrypted_data.role == expected_data["role"]

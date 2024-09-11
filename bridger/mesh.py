@@ -284,6 +284,8 @@ class PBPacketProcessor(PacketProcessor):
             encrypted_data,
         )
 
+        logger.debug(f"Decrypted data: {decrypted_data}")
+
         try:
             data = Data()
             data.ParseFromString(decrypted_data)
