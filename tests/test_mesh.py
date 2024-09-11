@@ -59,8 +59,9 @@ def nodeinfo_encrypted():
 class TestPBPacketProcessor:
     def test_init_success(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
         with patch.object(Position, "FromString", return_value=MagicMock()):
-            processor = PBPacketProcessor(influx_client, service_envelope)
+            processor = PBPacketProcessor(influx_client, service_envelope, force_decode=True)
             assert processor.portnum == PortNum.POSITION_APP
+            assert processor.force_decode is True
 
     def test_init_failure(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
         # Modify the envelope to use an unsupported portnum
