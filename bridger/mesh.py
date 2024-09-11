@@ -157,6 +157,7 @@ class PBPacketProcessor(PacketProcessor):
     ):
         super().__init__(influx_client, service_envelope)
 
+        self.force_decode = force_decode
         self.crypto_engine = CryptoEngine()
 
         if auto_decrypt and self.encrypted:
