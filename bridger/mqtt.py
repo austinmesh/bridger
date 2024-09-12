@@ -40,7 +40,9 @@ class BridgerMQTT(Client):
         message_payload = base64.b64encode(message.payload)
         breadcrumb_data = {"topic": message.topic, "payload": message_payload}
 
-        logger.bind(**breadcrumb_data).debug(f"Message payload base64 encoded: {message_payload}")
+        logger.bind(**breadcrumb_data).opt(colors=True).debug(
+            f"MQTT message on topic <green>{message.topic}</green>: {message_payload}"
+        )
         add_breadcrumb(level="info", data=breadcrumb_data, category="mqtt", message="Received message")
 
         try:
@@ -50,7 +52,7 @@ class BridgerMQTT(Client):
 
             if packet_id in self.message_queue:
                 logger.bind(envelope_id=packet_id).opt(colors=True).debug(
-                    f"Packet <yellow>{packet_id}</yellow> from {gateway_id} already in queue"
+                    f"Packet <yellow>{packet_id}</yellow> from <green>{gateway_id}</green> already in queue"
                 )
                 return
 
