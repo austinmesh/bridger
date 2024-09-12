@@ -124,11 +124,11 @@ class PacketProcessor(ABC):
 
             if isinstance(record, list):
                 logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {len(record)} {measurement} packets from gateway: {record[0].gateway_id}"
+                    f"Wrote {len(record)} {measurement} packets from gateway: <green>{record[0].gateway_id}</green>"
                 )
             else:
                 logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {measurement} packet <yellow>{record.packet_id}</yellow> from gateway: {record.gateway_id}"
+                    f"Wrote {measurement} packet <yellow>{record.packet_id}</yellow> from gateway: <green>{record.gateway_id}</green>"  # noqa: E501
                 )
         except ApiException as e:
             if e.status == 401:
