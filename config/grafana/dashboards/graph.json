@@ -1,0 +1,102 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 4,
+    "links": [
+      {
+        "asDropdown": false,
+        "icon": "external link",
+        "includeVars": false,
+        "keepTime": false,
+        "tags": [
+          "austinmesh"
+        ],
+        "targetBlank": false,
+        "title": "Other Dashboards",
+        "tooltip": "",
+        "type": "dashboards",
+        "url": ""
+      }
+    ],
+    "panels": [
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "gridPos": {
+          "h": 25,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "options": {
+          "edges": {
+            "mainStatUnit": "dB"
+          },
+          "nodes": {
+            "arcs": []
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"neighbor\")\n  |> filter(fn: (r) => r[\"_field\"] == \"snr\")\n  |> group(columns: [\"_measurement\", \"_field\", \"neighbor_id\", \"node_id\"])\n  |> mean()\n  |> rename(columns: {node_id: \"source\", neighbor_id: \"target\", _value: \"mainstat\"})\n  |> map(fn: (r) => ({r with \"id\": r.source + \"_\" + r.target}))\n  |> map(fn: (r) => ({r with \"color\": \n    if r.mainstat < -20 then\n      \"#FF0000\"  // Red\n    else if r.mainstat < -18 then\n      \"#FF1A00\"  // Red-Orange\n    else if r.mainstat < -16 then\n      \"#FF3300\"  // Dark Orange\n    else if r.mainstat < -14 then\n      \"#FF4D00\"  // Orange\n    else if r.mainstat < -12 then\n      \"#FF6600\"  // Yellow-Orange\n    else if r.mainstat < -10 then\n      \"#FF8000\"  // Yellow\n    else if r.mainstat < -8 then\n      \"#FF9900\"  // Light Yellow\n    else if r.mainstat < -6 then\n      \"#FFB300\"  // Lighter Yellow\n    else if r.mainstat < -5 then\n      \"#CCFF33\"  // Yellow-Green\n    else if r.mainstat < -3 then\n      \"#99FF66\"  // Light Yellow-Green\n    else if r.mainstat < -1 then\n      \"#66FF66\"  // Pale Green\n    else if r.mainstat < 1 then\n      \"#4DFF4D\"  // Soft Green\n    else if r.mainstat < 3 then\n      \"#33FF33\"  // Green\n    else if r.mainstat < 5 then\n      \"#1AFF1A\"  // Bright Green\n    else if r.mainstat < 7 then\n      \"#00FF00\"  // Pure Green\n    else if r.mainstat < 9 then\n      \"#00E600\"  // Deep Green\n    else\n      \"#00CC00\"  // Darker Green\n  }))\n  |> keep(columns: [\"id\", \"source\", \"target\", \"mainstat\", \"color\"])\n  |> group()\n  |> yield(name: \"edges\")\n",
+            "refId": "edges"
+          },
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "hide": false,
+            "query": "import \"join\"\n\nnodes = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"node\")\n  |> drop(columns: [\"_field\", \"_value\", \"_start\", \"_stop\", \"to\", \"channel_id\"])\n  |> group(columns: [\"_from\", \"short_name\", \"long_name\"])\n  |> last(column: \"_from\")\n  |> rename(columns: {_from: \"id\"})\n  |> group()\n\nsources = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"neighbor\")\n  |> filter(fn: (r) => r[\"_field\"] == \"node_broadcast_interval_secs\")\n  |> group(columns: [\"node_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> rename(columns: {node_id: \"id\"})\n  |> map(fn: (r) => ({r with \"title\": r.id, \"nodeRadius\": 10}))\n  |> keep(columns: [\"id\", \"title\", \"nodeRadius\"])\n  |> group()\n\ntargets = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"neighbor\")\n  |> filter(fn: (r) => r[\"_field\"] == \"node_broadcast_interval_secs\")\n  |> group(columns: [\"neighbor_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> rename(columns: {neighbor_id: \"id\"})\n  |> keep(columns: [\"id\", \"title\", \"nodeRadius\"])\n  |> group()\n\njoinedTargets = join.left(\n    left: targets,\n    right: nodes,\n    on: (l, r) => l.id == r.id,\n    as: (l, r) => ({l with short_name: r.short_name, long_name: r.long_name})\n  )\n\njoinedSources = join.left(\n    left: sources,\n    right: nodes,\n    on: (l, r) => l.id == r.id,\n    as: (l, r) => ({l with short_name: r.short_name, long_name: r.long_name})\n  )\n\nunion(tables: [joinedSources, joinedTargets])\n  |> map(fn: (r) => ({r with \"nodeRadius\": 10, \"title\": \n    if exists r.short_name then\n      r.short_name\n    else\n      r.id}))\n  |> unique(column: \"id\")",
+            "refId": "nodes"
+          }
+        ],
+        "title": "Node Graph",
+        "type": "nodeGraph"
+      }
+    ],
+    "refresh": "",
+    "schemaVersion": 39,
+    "tags": [
+      "graph",
+      "austinmesh"
+    ],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Node Graph",
+    "uid": "cdrefqgftmc5cc",
+    "version": 8,
+    "weekStart": ""
+  }
