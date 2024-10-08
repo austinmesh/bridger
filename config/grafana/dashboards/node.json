@@ -1,0 +1,1058 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "target": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "type": "dashboard"
+        }
+      ]
+    },
+    "description": "Information about an individual node as seen by the gateways (or a specific gateway) in the mesh. Select the node from the \"Nodes\" dropdown menu. If you want to view that nodes data as seen through a specific gateway then select that gateway as well.",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 6,
+    "links": [
+      {
+        "asDropdown": false,
+        "icon": "external link",
+        "includeVars": false,
+        "keepTime": false,
+        "tags": [
+          "austinmesh"
+        ],
+        "targetBlank": false,
+        "title": "Other Dashboards",
+        "tooltip": "",
+        "type": "dashboards",
+        "url": ""
+      }
+    ],
+    "panels": [
+      {
+        "datasource": {
+          "default": false,
+          "type": "datasource",
+          "uid": "-- Mixed --"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Hex"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "green",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "ID"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "yellow",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Model"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "orange",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Name Short"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Name Long"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "blue",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 18,
+          "x": 0,
+          "y": 0
+        },
+        "id": 5,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "/.*/",
+            "values": false
+          },
+          "showPercentChange": false,
+          "text": {
+            "titleSize": 16,
+            "valueSize": 24
+          },
+          "textMode": "value_and_name",
+          "wideLayout": false
+        },
+        "pluginVersion": "11.2.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "import \"join\"\nimport \"strings\"\nimport \"contrib/bonitoo-io/hex\"\n\nhexify = (str) => {\n  hexString = hex.string(v: int(v: str))\n  return if strings.strlen(v: hexString) == 7 then \"0\" + hexString else hexString\n}\n\nmodels = from(bucket: \"meshtastic\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"modelinfo\")\n  |> group(columns: [\"displayName\"])\n  |> distinct()\n  |> group()\n\nnodes = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"node\")\n  |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({r with hw_model: int(v: r.hw_model)}))\n  |> filter(fn: (r) => r._from == \"${nodes}\")\n  |> group(columns: [\"_from\"])\n  |> last(column: \"_from\")\n  |> group()\n\njoin.left(\n  left: nodes,\n  right: models,\n  on: (l, r) => r._value == l.hw_model,\n  as: (l, r) => ({l with model: if exists r.displayName then r.displayName  else \"Unknown\"})\n)\n  |> keep(columns: [\"short_name\", \"long_name\", \"model\", \"_from\"])\n  |> map(fn: (r) => ({r with \"Hex\": \"!\" + hexify(str: r._from)}))\n  |> rename(columns: {_from: \"ID\", short_name: \"Name Short\", long_name: \"Name Long\", model: \"Model\"})",
+            "refId": "A"
+          },
+          {
+            "columns": [],
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "fdwg472exygaoe"
+            },
+            "filters": [],
+            "format": "table",
+            "global_query_id": "list-records",
+            "hide": false,
+            "refId": "B",
+            "root_selector": "",
+            "source": "url",
+            "type": "global",
+            "url": "https://github.com/grafana/grafana-infinity-datasource/blob/main/testdata/users.json",
+            "url_options": {
+              "data": "",
+              "method": "GET"
+            }
+          }
+        ],
+        "title": "Node Info",
+        "transformations": [
+          {
+            "id": "renameByRegex",
+            "options": {
+              "regex": "^(User ID)$",
+              "renamePattern": "Hex"
+            }
+          },
+          {
+            "id": "joinByField",
+            "options": {
+              "byField": "Hex",
+              "mode": "outerTabular"
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Created By B": true,
+                "Device B": true,
+                "Long Name B": true,
+                "Short Name B": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "Created By B": 5,
+                "Device B": 6,
+                "Discord Handle B": 7,
+                "General Location B": 8,
+                "Hex": 0,
+                "ID": 1,
+                "Long Name B": 9,
+                "Model": 3,
+                "Name Long": 2,
+                "Name Short": 4,
+                "Node Type B": 10,
+                "Notes B": 12,
+                "Role B": 11,
+                "Short Name B": 13
+              },
+              "renameByName": {
+                "Device B": "",
+                "Discord Handle B": "Discord",
+                "General Location B": "Location",
+                "Node Type B": "Type",
+                "Notes B": "Notes",
+                "Role B": "Role"
+              }
+            }
+          },
+          {
+            "id": "filterByValue",
+            "options": {
+              "filters": [
+                {
+                  "config": {
+                    "id": "isNotNull",
+                    "options": {}
+                  },
+                  "fieldName": "ID"
+                }
+              ],
+              "match": "all",
+              "type": "include"
+            }
+          }
+        ],
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 18,
+          "y": 0
+        },
+        "id": 4,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "max"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "text": {
+            "valueSize": 30
+          },
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "11.2.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"neighbor\")\n  |> filter(fn: (r) => r[\"_from\"] == \"${nodes}\")\n  |> group(columns: [\"_field\", \"_from\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: count, createEmpty: false, column: \"neighbor_id\")\n  |> rename(columns: {neighbor_id: \"_value\"})\n  |> movingAverage(n: 10)\n  |> group()",
+            "refId": "A"
+          }
+        ],
+        "title": "Neighbors Seen",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "fieldMinMax": false,
+            "mappings": [],
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 18,
+          "y": 4
+        },
+        "id": 14,
+        "maxDataPoints": 200,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "max"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "11.2.0",
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"battery\" and r._field == \"uptime_seconds\")\n  |> filter(fn: (r) => r._from == \"${nodes}\")\n  |> filter(fn: (r) => if length(arr: ${gateway:json}) == 0 then true else contains(value: r.gateway_id, set: ${gateway:json}))",
+            "refId": "A"
+          }
+        ],
+        "title": "Uptime",
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          }
+        ],
+        "type": "stat"
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 0,
+          "y": 8
+        },
+        "id": 11,
+        "libraryPanel": {
+          "name": "Temperature",
+          "uid": "advfxaterb1moa"
+        },
+        "title": "Temperature"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "semi-dark-purple",
+              "mode": "fixed"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": 21600000,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": 10800000,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "displayName": "${__field.labels.short_name}",
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "purple",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "humidity"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "weather.openweathermap humidity {domain=\"weather\", entity_id=\"openweathermap\"}"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "Ambient Humidity"
+                },
+                {
+                  "id": "custom.lineStyle",
+                  "value": {
+                    "dash": [
+                      10,
+                      10
+                    ],
+                    "fill": "dash"
+                  }
+                },
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "dark-orange",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 11,
+          "y": 8
+        },
+        "id": 9,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "max",
+              "min",
+              "mean"
+            ],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "hide": false,
+            "query": "import \"join\"\n\nhumidity = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"sensor\")\n  |> filter(fn: (r) => r[\"_field\"] == \"relative_humidity\")\n  |> filter(fn: (r) => r[\"_from\"] == string(v: ${nodes}))\n  |> rename(columns: {_from: \"id\"})\n  |> group()\n  \n\nnodes = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"node\")\n  |> drop(columns: [\"_field\", \"_value\", \"_start\", \"_stop\", \"to\", \"channel_id\"])\n  |> group(columns: [\"_from\", \"short_name\", \"long_name\"])\n  |> last(column: \"_from\")\n  |> rename(columns: {_from: \"id\"})\n  |> group()\n\n\njoined = join.left(\n    left: humidity,\n    right: nodes,\n    on: (l, r) => l.id == r.id,\n    as: (l, r) => ({l with short_name: r.short_name, long_name: r.long_name})\n  )\n\njoined\n  |> group(columns: [\"_measurement\", \"_field\", \"id\", \"short_name\", \"long_name\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 5)",
+            "refId": "humidity"
+          },
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "hide": false,
+            "query": "from(bucket: \"weather\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"weather.openweathermap\")\n  |> filter(fn: (r) => r[\"_field\"] == \"humidity\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+            "refId": "outside_f"
+          }
+        ],
+        "title": "Humidity",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic-by-name"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "displayName": "${__field.name}",
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "dB"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 0,
+          "y": 16
+        },
+        "id": 6,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "mean",
+              "min",
+              "max",
+              "p95"
+            ],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "rxSnr = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_field\"] == \"rx_snr\")\n  |> filter(fn: (r) => if length(arr: ${gateway:json}) == 0 then true else contains(value: r.gateway_id, set: ${gateway:json}))\n  |> filter(fn: (r) => r[\"_from\"] == \"${nodes}\")\n  |> filter(fn: (r) => r[\"_value\"] != 0)\n  |> group(columns: [\"_from\", \"_field\"])\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_mean\"})\n  |> yield(name: \"mean\")\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_min\"})\n  |> yield(name: \"min\")\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_max\"})\n  |> yield(name: \"max\")",
+            "refId": "A"
+          }
+        ],
+        "title": "Node RX SNR",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic-by-name"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "displayName": "${__field.name}",
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "dB"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 11,
+          "y": 16
+        },
+        "id": 7,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "mean",
+              "min",
+              "max",
+              "p95"
+            ],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "rxSnr = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_field\"] == \"rx_rssi\")\n  |> filter(fn: (r) => if length(arr: ${gateway:json}) == 0 then true else contains(value: r.gateway_id, set: ${gateway:json}))\n  |> filter(fn: (r) => r[\"_from\"] == \"${nodes}\")\n  |> filter(fn: (r) => r[\"_value\"] != 0)\n  |> group(columns: [\"_from\", \"_field\"])\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_mean\"})\n  |> yield(name: \"mean\")\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_min\"})\n  |> yield(name: \"min\")\n\nrxSnr\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> movingAverage(n: 10)\n  |> rename(columns: {_value: \"snr_max\"})\n  |> yield(name: \"max\")",
+            "refId": "A"
+          }
+        ],
+        "title": "Node RX RSSI",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "blue",
+              "mode": "shades"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "decimals": 2,
+            "displayName": "${__field.name}",
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "volt"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 0,
+          "y": 24
+        },
+        "id": 12,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "mean",
+              "min",
+              "max",
+              "p95"
+            ],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "import \"experimental/array\"\n\nbattery = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"battery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"voltage\")\n  |> filter(fn: (r) => if length(arr: ${gateway:json}) == 0 then true else contains(value: r.gateway_id, set: ${gateway:json}))\n  |> filter(fn: (r) => if length(arr: array.toString(arr: [${nodes::doublequote}])) == 0 then true else contains(value: r._from, set: array.toString(arr: [${nodes::doublequote}])))\n  |> filter(fn: (r) => r[\"_value\"] != 0)\n  |> group(columns: [\"_from\", \"_field\"])\n\nbattery\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 10)",
+            "refId": "A"
+          }
+        ],
+        "title": "Battery Voltage",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "default": true,
+          "type": "influxdb",
+          "uid": "adpwvhf6t1wjkd"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "purple",
+              "mode": "fixed"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": false,
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "displayName": "${__field.name}",
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 11,
+          "x": 11,
+          "y": 24
+        },
+        "id": 13,
+        "options": {
+          "legend": {
+            "calcs": [
+              "last",
+              "mean",
+              "min",
+              "max",
+              "p95"
+            ],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "influxdb",
+              "uid": "adpwvhf6t1wjkd"
+            },
+            "query": "battery = from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"battery\")\n  |> filter(fn: (r) => r[\"_field\"] == \"battery_level\")\n  |> filter(fn: (r) => if length(arr: ${gateway:json}) == 0 then true else contains(value: r.gateway_id, set: ${gateway:json}))\n  |> filter(fn: (r) => r[\"_from\"] == \"${nodes}\")\n  |> filter(fn: (r) => r[\"_value\"] != 0)\n  |> group(columns: [\"_from\", \"_field\"])\n\nbattery\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> movingAverage(n: 10)",
+            "refId": "A"
+          }
+        ],
+        "title": "Battery Level",
+        "type": "timeseries"
+      }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+      "node",
+      "austinmesh"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "selected": true,
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "datasource": {
+            "type": "influxdb",
+            "uid": "adpwvhf6t1wjkd"
+          },
+          "definition": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => (exists r[\"gateway_id\"]))\n  |> keep(columns: [\"gateway_id\"])\n  |> distinct(column: \"gateway_id\")\n  |> group()",
+          "description": "Gateway to filter data for.",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Gateway",
+          "multi": true,
+          "name": "gateway",
+          "options": [],
+          "query": {
+            "query": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => (exists r[\"gateway_id\"]))\n  |> keep(columns: [\"gateway_id\"])\n  |> distinct(column: \"gateway_id\")\n  |> group()"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        },
+        {
+          "allValue": "[]",
+          "current": {
+            "selected": false,
+            "text": "☀️ SOL2 Repeater (SOL2 / 4000987900)",
+            "value": "4000987900"
+          },
+          "datasource": {
+            "type": "influxdb",
+            "uid": "adpwvhf6t1wjkd"
+          },
+          "definition": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"node\")\n  |> keep(columns: [\"_time\", \"_from\", \"long_name\", \"short_name\"])\n  |> map(fn: (r) => ({ r with __value: string(v: r._from) + \":\" + string(v: r.long_name) + \" (\" + string(v: r.short_name) + \" / \" + string(v: r._from) + \")\" }))\n  |> group(columns: [\"__value\"])\n  |> last(column: \"_time\")\n  |> group()",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Node",
+          "multi": false,
+          "name": "nodes",
+          "options": [],
+          "query": {
+            "query": "from(bucket: \"meshtastic\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"node\")\n  |> keep(columns: [\"_time\", \"_from\", \"long_name\", \"short_name\"])\n  |> map(fn: (r) => ({ r with __value: string(v: r._from) + \":\" + string(v: r.long_name) + \" (\" + string(v: r.short_name) + \" / \" + string(v: r._from) + \")\" }))\n  |> group(columns: [\"__value\"])\n  |> last(column: \"_time\")\n  |> group()"
+          },
+          "refresh": 1,
+          "regex": "/(?<value>[0-9]+)\\:(?<text>.*)/",
+          "skipUrlSync": false,
+          "sort": 7,
+          "type": "query"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Individual Node",
+    "uid": "bdu5zhxo2y1vkd",
+    "version": 37,
+    "weekStart": ""
+  }
