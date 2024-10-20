@@ -72,6 +72,8 @@ paho-mqtt==2.1.0
     # via
     #   aiomqtt
     #   bridger (pyproject.toml)
+pendulum==3.0.0
+    # via bridger (pyproject.toml)
 pluggy==1.5.0
     # via pytest
 propcache==0.2.1
@@ -110,6 +112,8 @@ python-dateutil==2.9.0.post0
     # via
     #   arrow
     #   influxdb-client
+    #   pendulum
+    #   time-machine
 python-dotenv==1.0.1
     # via bridger (pyproject.toml)
 pyyaml==6.0.2
@@ -129,6 +133,8 @@ six==1.17.0
     # via python-dateutil
 tabulate==0.9.0
     # via meshtastic
+time-machine==2.16.0
+    # via pendulum
 types-python-dateutil==2.9.0.20241206
     # via arrow
 typing-extensions==4.12.2
@@ -137,7 +143,9 @@ typing-extensions==4.12.2
     #   typing-inspect
 typing-inspect==0.9.0
     # via dataclasses-json
-urllib3==2.3.0
+tzdata==2024.2
+    # via pendulum
+urllib3==2.2.3
     # via
     #   influxdb-client
     #   requests

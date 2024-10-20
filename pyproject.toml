@@ -28,6 +28,7 @@ dependencies = [
     "loguru",
     "meshtastic",
     "paho-mqtt",
+    "pendulum",
     "protobuf",
     "pytest",
     "pytest-cov",
