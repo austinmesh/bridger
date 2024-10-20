@@ -117,11 +117,12 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         for gateway in gateways:
             owner = self.bot.get_user(gateway.owner_id)
+            owner_name = owner.name if owner else "Unknown"
 
             embed.add_field(
                 name="Gateway",
-                value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner.name}**",
-                inline=True,
+                value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                inline=False,
             )
 
         await ctx.response.send_message(
