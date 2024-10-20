@@ -92,7 +92,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     )
     async def request_account(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
-        message = f"Gateway created: {gateway.node_hex_id} with password: {password}"
+        message = f"Gateway created for node **{gateway.node_hex_id}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
 
         await ctx.response.send_message(message, ephemeral=True)
 
