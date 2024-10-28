@@ -4,7 +4,7 @@ StartLimitBurst = 5
 
 [Container]
 Exec = '-config.file=/mnt/config/promtail.yaml'
-Image = docker.io/grafana/promtail:3.1.0
+Image = docker.io/grafana/promtail:3.2.1
 Network = bridger.network
 HostName = promtail
 Volume = bridger-data.volume:/var/lib/bridger

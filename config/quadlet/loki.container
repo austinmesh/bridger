@@ -5,7 +5,7 @@ StartLimitBurst = 5
 [Container]
 HostName = loki
 Exec = '-config.file=/mnt/config/loki.yaml'
-Image = docker.io/grafana/loki:3.1.0
+Image = docker.io/grafana/loki:3.2.1
 Volume = /home/andy/.config/bridger:/mnt/config
 Volume = loki-data.volume:/var/lib/loki
 Network = bridger.network
