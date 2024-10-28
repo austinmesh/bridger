@@ -1,13 +1,28 @@
 import os
 
+import arrow
 from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 from discord.utils import get
+from influxdb_client import InfluxDBClient
 
 from bridger.gateway import GatewayError, GatewayManagerEMQX, emqx
 from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
+TIMESTAMP_FORMAT = "h:mm:ss A ZZZ"
+QUERY_RECENT_PACKETS = """
+from(bucket: "meshtastic")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r["gateway_id"] == "{}")
+  |> filter(fn: (r) => r["_field"] == "packet_id")
+  |> keep(columns: ["_from", "_time", "_measurement"])
+  |> group()
+  |> sort(columns: ["_time"])
+"""
+
+influx_client: InfluxDBClient = InfluxDBClient.from_env_properties()
+query_client = influx_client.query_api()
 
 
 def check_gateway_owner(interaction: Interaction) -> bool:
@@ -140,6 +155,26 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             f"Gateway password reset: {gateway.node_hex_id} with new password: {password}",
             ephemeral=True,
         )
+
+    @app_commands.command(name="is-alive", description="Check if MQTT gateway is alive and receiving packets")
+    async def is_alive(self, ctx: Interaction, node_id: str):
+        gateway = self.gateway_manager.get_gateway(node_id)
+        tables = query_client.query(QUERY_RECENT_PACKETS.format(gateway.node_hex_id_with_bang))
+
+        if not tables:
+            await ctx.response.send_message(
+                f"We haven't received any packets from **{gateway.node_hex_id}** in the last hour", ephemeral=True
+            )
+        else:
+            records = tables[0].records
+            record = max(records, key=lambda r: r.values.get("_time"))
+            time = arrow.get(record.values.get("_time")).to("local")
+            time_human = time.humanize()
+            time_stamp = time.format(TIMESTAMP_FORMAT)
+
+            await ctx.response.send_message(
+                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at **{time_stamp}** ({time_human})"  # noqa: E501
+            )
 
 
 async def setup(bot):

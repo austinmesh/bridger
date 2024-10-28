@@ -9,6 +9,12 @@
             "type": "debugpy",
             "request": "launch",
             "module": "bridger.bot"
+        },
+        {
+            "name": "Bridger",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "bridger"
         }
     ]
 }

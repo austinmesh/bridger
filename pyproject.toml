@@ -17,6 +17,7 @@ authors = [
 ]
 
 dependencies = [
+    "arrow",
     "cryptography",
     "dataclasses-json",
     "discord.py",
