@@ -6,7 +6,7 @@
 #
 aiohappyeyeballs==2.4.3
     # via aiohttp
-aiohttp==3.10.9
+aiohttp==3.10.10
     # via discord-py
 aiosignal==1.3.1
     # via aiohttp
@@ -14,7 +14,7 @@ arrow==1.3.0
     # via bridger (pyproject.toml)
 attrs==24.2.0
     # via aiohttp
-bleak==0.21.1
+bleak==0.22.3
     # via meshtastic
 certifi==2024.8.30
     # via
@@ -23,11 +23,11 @@ certifi==2024.8.30
     #   sentry-sdk
 cffi==1.17.1
     # via cryptography
-charset-normalizer==3.3.2
+charset-normalizer==3.4.0
     # via requests
-coverage==7.6.1
+coverage==7.6.4
     # via pytest-cov
-cryptography==43.0.1
+cryptography==43.0.3
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
@@ -37,7 +37,7 @@ discord-py==2.4.0
     # via bridger (pyproject.toml)
 dotmap==1.3.30
     # via meshtastic
-frozenlist==1.4.1
+frozenlist==1.5.0
     # via
     #   aiohttp
     #   aiosignal
@@ -45,15 +45,15 @@ idna==3.10
     # via
     #   requests
     #   yarl
-influxdb-client==1.46.0
+influxdb-client==1.47.0
     # via bridger (pyproject.toml)
 iniconfig==2.0.0
     # via pytest
 loguru==0.7.2
     # via bridger (pyproject.toml)
-marshmallow==3.22.0
+marshmallow==3.23.0
     # via dataclasses-json
-meshtastic==2.5.1
+meshtastic==2.5.3
     # via bridger (pyproject.toml)
 multidict==6.1.0
     # via
@@ -74,7 +74,9 @@ pluggy==1.5.0
     # via pytest
 print-color==0.4.6
     # via meshtastic
-protobuf==5.28.2
+propcache==0.2.0
+    # via yarl
+protobuf==5.28.3
     # via
     #   bridger (pyproject.toml)
     #   meshtastic
@@ -82,7 +84,7 @@ ptyprocess==0.7.0
     # via pexpect
 pycparser==2.22
     # via cffi
-pyparsing==3.1.4
+pyparsing==3.2.0
     # via meshtastic
 pypubsub==4.0.3
     # via meshtastic
@@ -113,7 +115,7 @@ requests==2.32.3
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.15.0
+sentry-sdk==2.17.0
     # via bridger (pyproject.toml)
 six==1.16.0
     # via python-dateutil
@@ -134,7 +136,7 @@ urllib3==2.2.3
     #   sentry-sdk
 webencodings==0.5.1
     # via meshtastic
-yarl==1.13.1
+yarl==1.17.0
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
