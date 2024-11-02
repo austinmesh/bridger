@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5.1.0
@@ -48,6 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5.1.0
@@ -72,6 +76,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
 
       - name: Extract branch name
         id: extract_branch
@@ -123,6 +129,8 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 0
 
       - name: Extract tag from ref
         id: extract_tag
