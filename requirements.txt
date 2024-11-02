@@ -51,9 +51,9 @@ iniconfig==2.0.0
     # via pytest
 loguru==0.7.2
     # via bridger (pyproject.toml)
-marshmallow==3.23.0
+marshmallow==3.23.1
     # via dataclasses-json
-meshtastic==2.5.3
+meshtastic==2.5.4
     # via bridger (pyproject.toml)
 multidict==6.1.0
     # via
@@ -96,7 +96,7 @@ pytest==8.3.3
     # via
     #   bridger (pyproject.toml)
     #   pytest-cov
-pytest-cov==5.0.0
+pytest-cov==6.0.0
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
@@ -136,7 +136,7 @@ urllib3==2.2.3
     #   sentry-sdk
 webencodings==0.5.1
     # via meshtastic
-yarl==1.17.0
+yarl==1.17.1
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
