@@ -86,3 +86,18 @@ class PowerTelemetryPoint(TelemetryPoint):
     voltage: Optional[float] = None
     current: Optional[float] = None
     channel: Optional[str] = None
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
+class TextMessagePoint(TelemetryPoint):
+    text: Optional[str] = None
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
+class TraceRoutePoint(TelemetryPoint):
+    route: Optional[int] = None
+    snr_towards: Optional[int] = None
+    route_back: Optional[int] = None
+    snr_back: Optional[int] = None

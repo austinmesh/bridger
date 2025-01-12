@@ -1,3 +1,9 @@
+## Additional To Add
+
+* TEXT_MESSAGE_APP
+* ADMIN_APP
+* ROUTING_APP
+
 ## Protobuf Messages
 
 NodeInfo:
