@@ -9,6 +9,7 @@ from google.protobuf.message import DecodeError
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
+from meshtastic import KnownProtocol, protocols
 from meshtastic.protobuf.mesh_pb2 import Data, NeighborInfo, Position, User
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
@@ -28,12 +29,22 @@ from bridger.log import file_logger, logger
 
 INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
 
-DECODERS = {
-    PortNum.NODEINFO_APP: User,
-    PortNum.POSITION_APP: Position,
-    PortNum.TELEMETRY_APP: Telemetry,
-    PortNum.NEIGHBORINFO_APP: NeighborInfo,
-}
+SUPPORTED_PACKET_TYPES = [
+    "text",
+    "position",
+    "user",
+    "telemetry",
+    "neighborinfo",
+    "traceroute",
+    "admin",
+]  # See meshtastic.protocols for the names of packet types
+
+# DECODERS = {
+#     PortNum.NODEINFO_APP: User,
+#     PortNum.POSITION_APP: Position,
+#     PortNum.TELEMETRY_APP: Telemetry,
+#     PortNum.NEIGHBORINFO_APP: NeighborInfo,
+# }
 
 
 class PacketProcessorError(Exception):
@@ -176,14 +187,22 @@ class PBPacketProcessor(PacketProcessor):
         return self.service_envelope.packet.decoded.portnum
 
     @property
+    def portnum_protocol(self) -> Optional[KnownProtocol]:
+        return protocols.get(self.portnum, None)
+
+    @property
+    def portnum_friendly_name(self) -> Optional[str]:
+        return getattr(self.portnum_protocol, "name", None)
+
+    @property
     def payload(self):
-        if self.portnum not in DECODERS:
+        if self.portnum_friendly_name in SUPPORTED_PACKET_TYPES:
+            return self.portnum_protocol.protobufFactory.FromString(self.service_envelope.packet.decoded.payload)
+        else:
             raise PacketProcessorError(
                 f"We cannot yet decode: {PortNum.Name(self.portnum)}",
                 portnum=self.portnum,
             )
-
-        return DECODERS[self.portnum].FromString(self.service_envelope.packet.decoded.payload)
 
     @property
     def encrypted(self) -> bool:
@@ -265,7 +284,12 @@ class PBPacketProcessor(PacketProcessor):
                     neighbor_points.append(NeighborInfoPacket(**point_data))
 
                 return neighbor_points
-
+            elif self.portnum == PortNum.TEXT_MESSAGE_APP:
+                pass
+            elif self.portnum == PortNum.ADMIN_APP:
+                pass
+            elif self.portnum == PortNum.ROUTING_APP:
+                pass
             else:
                 logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
                 logger.debug(f"Payload: {self.payload_as_dict}")
