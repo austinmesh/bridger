@@ -13,7 +13,7 @@ on:
 
 jobs:
   linting:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.1.7
         with:
@@ -47,7 +47,7 @@ jobs:
         with:
           options: "-l 125 --check --diff --verbose"
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.1.7
         with:
@@ -102,7 +102,7 @@ jobs:
             echo "tags=ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:$BRANCH_NAME ghcr.io/${{ github.repository }}:latest" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build image
+      - name: Build bridger image
         id: build_image
         uses: redhat-actions/buildah-build@v2.13
         with:
@@ -113,10 +113,28 @@ jobs:
           build-args: |
             release=bridger@${{ steps.extract_branch.outputs.branch_name }}
 
+      - name: Build simple-proxy image
+        id: build_simple_proxy
+        uses: redhat-actions/buildah-build@v2.13
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/simple-proxy
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/simple-proxy:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/simple-proxy:latest
+          containerfiles: ./config/docker/simple-proxy/Containerfile
+
       - name: Push image
         uses: redhat-actions/push-to-registry@v2
         with:
           tags: ${{ steps.build_image.outputs.tags }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push simple-proxy manifests
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          tags: ${{ steps.build_simple_proxy.outputs.tags }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
