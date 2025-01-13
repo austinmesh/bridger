@@ -1,0 +1,6 @@
+FROM python:3.9.21-alpine
+RUN apk add --no-cache py3-pip
+RUN python3 -m venv /app
+ENV PATH="/app/bin:$PATH"
+RUN pip install simple-proxy
+ENTRYPOINT [ "simple-proxy" ]
