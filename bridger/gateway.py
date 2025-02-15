@@ -121,13 +121,11 @@ class GatewayManagerEMQX:
                 raise GatewayError(f"Gateway already exists: {e}", gateway)
         return gateway, password
 
-    def delete_gateway_user(self, gateway_id: str, discord_user: Union[User, Member]) -> bool:
-        gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
-        user = f"{discord_user.id}-{gateway_id_without_bang}"
-
+    def delete_gateway_user(self, gateway_id: str) -> bool:
         try:
-            self.emqx.delete_user(self.authentication_id, user)
-            self.emqx.delete_user_authorization_rules_built_in_database(user)
+            gateway = self.get_gateway(gateway_id)
+            self.emqx.delete_user(self.authentication_id, gateway.user_string)
+            self.emqx.delete_user_authorization_rules_built_in_database(gateway.user_string)
         except Exception:
             return False
 

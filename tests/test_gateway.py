@@ -95,7 +95,7 @@ def test_delete_gateway_user(gateway_manager, emqx_mock):
     emqx_mock.delete_user.return_value = None
     emqx_mock.delete_user_authorization_rules_built_in_database.return_value = None
 
-    success = gateway_manager.delete_gateway_user("1a2b3c4d", mock_discord_user)
+    success = gateway_manager.delete_gateway_user("1a2b3c4d")
 
     assert success is True
     emqx_mock.delete_user.assert_called_once_with(gateway_manager.authentication_id, "1234567890-1a2b3c4d")
@@ -106,7 +106,7 @@ def test_delete_gateway_user(gateway_manager, emqx_mock):
 def test_delete_gateway_user_fail(gateway_manager, emqx_mock):
     emqx_mock.delete_user.side_effect = Exception("Deletion failed")
 
-    success = gateway_manager.delete_gateway_user("1a2b3c4d", mock_discord_user)
+    success = gateway_manager.delete_gateway_user("1a2b3c4d")
 
     assert success is False
     emqx_mock.delete_user.assert_called_once()

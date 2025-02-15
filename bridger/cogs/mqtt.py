@@ -114,7 +114,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.checks.has_role(BRIDGER_ADMIN_ROLE)
     @app_commands.command(name="delete-account", description="Delete MQTT account")
     async def delete_account(self, ctx: Interaction, node_id: str):
-        if self.gateway_manager.delete_gateway_user(node_id, ctx.user):
+        if self.gateway_manager.delete_gateway_user(node_id):
             await ctx.response.send_message(f"Gateway deleted: {node_id}", ephemeral=True, delete_after=self.delete_after)
         else:
             await ctx.response.send_message(f"Gateway not found: {node_id}", ephemeral=True, delete_after=self.delete_after)
