@@ -17,6 +17,8 @@ authors = [
 ]
 
 dependencies = [
+    "aiohttp",
+    "aiocache",
     "arrow",
     "cryptography",
     "dataclasses-json",

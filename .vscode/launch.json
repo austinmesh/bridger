@@ -11,6 +11,12 @@
             "module": "bridger.bot"
         },
         {
+            "name": "HTTP Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "bridger.http"
+        },
+        {
             "name": "Bridger",
             "type": "debugpy",
             "request": "launch",
