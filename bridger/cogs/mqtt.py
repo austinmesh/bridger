@@ -152,7 +152,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         gateway, password = self.gateway_manager.reset_gateway_password(node_id, ctx.user)
 
         await ctx.response.send_message(
-            f"Gateway password reset: {gateway.node_hex_id} with new password: {password}",
+            f"Gateway **{gateway.node_hex_id}** password reset. The username is **{gateway.user_string}** with new password: `{password}`",  # noqa: E501
             ephemeral=True,
         )
 
