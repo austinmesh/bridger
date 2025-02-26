@@ -84,7 +84,9 @@ jobs:
       - name: Extract branch name
         id: extract_branch
         run: |
-          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+          if [[ "${GITHUB_REF}" == refs/heads/gh-readonly-queue/* ]]; then
+            BRANCH_NAME=$(echo "${GITHUB_REF}" | sed 's#refs/heads/gh-readonly-queue/[^/]*/##')
+          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
             BRANCH_NAME=${GITHUB_REF#refs/heads/}
           elif [[ "${GITHUB_REF}" == refs/pull/* ]]; then
             BRANCH_NAME=$(echo ${GITHUB_REF} | sed 's#refs/pull/##; s#/merge##')
