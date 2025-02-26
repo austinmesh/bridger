@@ -7,7 +7,7 @@ BASE_URL = "https://api.meshtastic.org"
 
 
 class DeviceModel:
-    device_hardware_path = "/device/hardware"
+    device_hardware_path = "/resource/deviceHardware"
 
     def __init__(self, session: ClientSession = None):
         self.session = session
