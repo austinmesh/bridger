@@ -10,6 +10,7 @@ Environment = MQTT_BROKER=emqx
 Environment = LOG_PATH=/var/lib/bridger/logs/http.log
 EnvironmentFile = /home/andy/.config/bridger.env
 Network = bridger.network
+PublishPort = 8080:8080
 HostName = http
 Volume = bridger-data.volume:/var/lib/bridger
 
