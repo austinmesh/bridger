@@ -173,7 +173,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             time_stamp = time.format(TIMESTAMP_FORMAT)
 
             await ctx.response.send_message(
-                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at **{time_stamp}** ({time_human})"  # noqa: E501
+                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at **{time_stamp}** ({time_human})",  # noqa: E501
+                ephemeral=True,
             )
 
 
