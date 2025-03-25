@@ -1,7 +1,9 @@
 import os
 
 from aiohttp import ClientSession, web
+from aiohttp.web_log import AccessLogger
 
+from bridger.log import logger
 from bridger.meshtastic import DeviceModel
 
 VERSION = os.getenv("VERSION", "development")
@@ -10,6 +12,12 @@ app = web.Application()
 routes = web.RouteTableDef()
 device = None
 session = None
+
+
+class SimpleLogger(AccessLogger):
+    @property
+    def enabled(self) -> bool:
+        return True
 
 
 async def on_startup(app):
@@ -54,4 +62,4 @@ app.on_cleanup.append(on_cleanup)
 app.add_routes(routes)
 
 if __name__ == "__main__":
-    web.run_app(app)
+    web.run_app(app, access_log=logger, access_log_class=SimpleLogger)

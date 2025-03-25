@@ -35,3 +35,10 @@ schema_config:
 
 ruler:
   alertmanager_url: http://localhost:9093
+
+pattern_ingester:
+  enable: true
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory

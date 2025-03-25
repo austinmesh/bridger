@@ -14,7 +14,10 @@
             "name": "HTTP Server",
             "type": "debugpy",
             "request": "launch",
-            "module": "bridger.http"
+            "module": "bridger.http",
+            "env": {
+                "LOG_PATH": "logs/http.log"
+            }
         },
         {
             "name": "Bridger",

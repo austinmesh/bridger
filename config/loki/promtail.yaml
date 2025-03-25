@@ -34,4 +34,14 @@ scrape_configs:
           - localhost
         labels:
           job: bridger
-          __path__: /var/lib/bridger/logs/*.log
+          __path__: /var/lib/bridger/logs/bridger.log
+      - targets:
+          - localhost
+        labels:
+          job: bot
+          __path__: /var/lib/bridger/logs/bot.log
+      - targets:
+          - localhost
+        labels:
+          job: http
+          __path__: /var/lib/bridger/logs/http.log
