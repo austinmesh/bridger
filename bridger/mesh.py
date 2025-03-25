@@ -9,7 +9,7 @@ from google.protobuf.message import DecodeError
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
-from meshtastic.protobuf.mesh_pb2 import Data, NeighborInfo, Position, User
+from meshtastic.protobuf.mesh_pb2 import Data, NeighborInfo, Position, RouteDiscovery, User
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
@@ -33,6 +33,7 @@ DECODERS = {
     PortNum.POSITION_APP: Position,
     PortNum.TELEMETRY_APP: Telemetry,
     PortNum.NEIGHBORINFO_APP: NeighborInfo,
+    PortNum.TRACEROUTE_APP: RouteDiscovery,
 }
 
 
@@ -278,24 +279,26 @@ class PBPacketProcessor(PacketProcessor):
         if not self.encrypted:
             return False
 
-        encrypted_data = self.service_envelope.packet.encrypted
-        decrypted_data = self.crypto_engine.decrypt(
-            getattr(self.service_envelope.packet, "from"),
-            self.service_envelope.packet.id,
-            encrypted_data,
-        )
+        self.process_encrypted_data(self.service_envelope, self.crypto_engine)
+
+        return True
+
+    @staticmethod
+    def process_encrypted_data(service_envelope: ServiceEnvelope, crypto_engine: CryptoEngine) -> None:
+        encrypted_data = service_envelope.packet.encrypted
+        source_id = getattr(service_envelope.packet, "from")
+        packet_id = service_envelope.packet.id
+        decrypted_data = crypto_engine.decrypt(source_id, packet_id, encrypted_data)
 
         logger.debug(f"Decrypted data: {decrypted_data}")
 
         try:
             data = Data()
             data.ParseFromString(decrypted_data)
-            self.service_envelope.packet.decoded.CopyFrom(data)
+            service_envelope.packet.decoded.CopyFrom(data)
         except DecodeError as e:
             logger.exception(f"Error decrypting message: {e}")
             raise PacketProcessorError(f"Error decrypting message: {e}")
-
-        return True
 
 
 if __name__ == "__main__":
