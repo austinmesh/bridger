@@ -22,5 +22,19 @@
             "request": "launch",
             "module": "bridger"
         }
+    ],
+    "compounds": [
+        {
+            "name": "All",
+            "configurations": ["Discord Bot", "HTTP Server", "Bridger"]
+        },
+        {
+            "name": "Bot & HTTP Server",
+            "configurations": ["Discord Bot", "HTTP Server"]
+        },
+        {
+            "name": "Bot & Bridger",
+            "configurations": ["Discord Bot", "Bridger"]
+        }
     ]
 }
