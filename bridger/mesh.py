@@ -28,6 +28,7 @@ from bridger.dataclasses import (
 from bridger.log import file_logger, logger
 
 INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
+INFLUXDB_V2_WRITE_PRECISION = os.getenv("INFLUXDB_V2_WRITE_PRECISION", "s")  # s, ms, us, or ns
 
 SUPPORTED_PACKET_TYPES = [
     "text",
@@ -131,6 +132,7 @@ class PacketProcessor(ABC):
                 record_measurement_name=measurement,
                 record_field_keys=fields + self.common_fields,
                 record_tag_keys=tags + self.common_tags,
+                write_precision=INFLUXDB_V2_WRITE_PRECISION,
             )
 
             if isinstance(record, list):
