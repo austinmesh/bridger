@@ -5,15 +5,14 @@ from argparse import ArgumentParser
 from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import DecodeError
+from google.protobuf.message import DecodeError, Message
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
 from meshtastic import KnownProtocol, protocols
-from meshtastic.protobuf.mesh_pb2 import Data, NeighborInfo, Position, User
+from meshtastic.protobuf.mesh_pb2 import Data
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
-from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
 from bridger.crypto import CryptoEngine
 from bridger.dataclasses import (
@@ -24,6 +23,8 @@ from bridger.dataclasses import (
     PowerTelemetryPoint,
     SensorTelemetryPoint,
     TelemetryPoint,
+    TextMessagePoint,
+    TraceRoutePoint,
 )
 from bridger.log import file_logger, logger
 
@@ -39,13 +40,6 @@ SUPPORTED_PACKET_TYPES = [
     "traceroute",
     "admin",
 ]  # See meshtastic.protocols for the names of packet types
-
-# DECODERS = {
-#     PortNum.NODEINFO_APP: User,
-#     PortNum.POSITION_APP: Position,
-#     PortNum.TELEMETRY_APP: Telemetry,
-#     PortNum.NEIGHBORINFO_APP: NeighborInfo,
-# }
 
 
 class PacketProcessorError(Exception):
@@ -102,6 +96,18 @@ class PacketProcessor(ABC):
             ["channel"],
             ["voltage", "current"],
             PortNum.TELEMETRY_APP,
+        ),
+        TextMessagePoint: (
+            "message",
+            [],
+            [],
+            PortNum.TEXT_MESSAGE_APP,
+        ),
+        TraceRoutePoint: (
+            "traceroute",
+            [],
+            [],
+            PortNum.TRACEROUTE_APP,
         ),
     }
 
@@ -178,11 +184,18 @@ class PBPacketProcessor(PacketProcessor):
 
     @property
     def payload_as_dict(self):
-        return MessageToDict(
-            self.payload,
-            preserving_proto_field_name=True,
-            use_integers_for_enums=True,
-        )
+        if isinstance(self.payload, str):
+            # For text messages
+            return {"text": self.payload}
+        elif isinstance(self.payload, bytes):
+            # For binary payloads maybe? Not sure if this will ever be used
+            return {"data": base64.b64encode(self.payload).decode("ascii")}
+        else:
+            return MessageToDict(
+                self.payload,
+                preserving_proto_field_name=True,
+                use_integers_for_enums=True,
+            )
 
     @property
     def portnum(self):
@@ -197,9 +210,18 @@ class PBPacketProcessor(PacketProcessor):
         return getattr(self.portnum_protocol, "name", None)
 
     @property
-    def payload(self):
+    def payload(self) -> Union[Message, str, bytes]:
         if self.portnum_friendly_name in SUPPORTED_PACKET_TYPES:
-            return self.portnum_protocol.protobufFactory.FromString(self.service_envelope.packet.decoded.payload)
+            payload = self.service_envelope.packet.decoded.payload
+
+            # We check if there is a factory since some messages (liek text) don't have protobuf factories
+            if self.portnum_protocol.protobufFactory:
+                return self.portnum_protocol.protobufFactory.FromString(payload)
+            else:
+                try:
+                    return payload.decode("utf-8")
+                except UnicodeDecodeError:
+                    return payload
         else:
             raise PacketProcessorError(
                 f"We cannot yet decode: {PortNum.Name(self.portnum)}",
@@ -287,11 +309,17 @@ class PBPacketProcessor(PacketProcessor):
 
                 return neighbor_points
             elif self.portnum == PortNum.TEXT_MESSAGE_APP:
-                pass
+                if isinstance(self.payload, str):
+                    # We are leaving out the actual text property here as we don't want to store actual messages
+                    return TextMessagePoint(**point_data)
+                return None
             elif self.portnum == PortNum.ADMIN_APP:
                 pass
             elif self.portnum == PortNum.ROUTING_APP:
                 pass
+            elif self.portnum == PortNum.TRACEROUTE_APP:
+                # TODO: The fields could be lists so we need to send each list item as a separate point
+                return TraceRoutePoint(**point_data)
             else:
                 logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
                 logger.debug(f"Payload: {self.payload_as_dict}")
