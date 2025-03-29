@@ -8,6 +8,7 @@ from meshtastic.protobuf.mesh_pb2 import Position
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 
+import bridger.mesh.handlers  # noqa: F401 # We need to import handlers to register them in the HANDLER_MAP
 from bridger.crypto import CryptoEngine
 from bridger.dataclasses import PositionPoint
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
@@ -29,7 +30,10 @@ power_packet_encrypted1 = base64.b64decode(b"CjMN9KoYDBX/////GAgqFY3Y05LhKIBqMwj
 
 @pytest.fixture
 def influx_client():
-    return MagicMock(spec=InfluxDBClient)
+    write_api_mock = MagicMock()
+    client = MagicMock(spec=InfluxDBClient)
+    client.write_api.return_value = write_api_mock
+    return client
 
 
 @pytest.fixture
@@ -71,23 +75,19 @@ class TestPBPacketProcessor:
             processor = PBPacketProcessor(influx_client, modified_envelope)
             processor.payload
 
-    def test_payload_as_dict(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
+    def test_payload_dict(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
         with patch.object(Position, "FromString", return_value=MagicMock()):
             processor = PBPacketProcessor(influx_client, service_envelope)
-            assert isinstance(processor.payload_as_dict, dict)
+            assert isinstance(processor.payload_dict, dict)
 
     def test_data(self, influx_client: MagicMock, service_envelope: ServiceEnvelope):
-        payload_dict = {
-            "latitude_i": 123456,
-            "longitude_i": 654321,
-            "altitude": 100,
-            "precision_bits": 10,
-            "speed": 50,
-            "time": 1609459200,
-        }
-        with patch.object(Position, "FromString", return_value=MagicMock()), patch.object(
-            PBPacketProcessor, "payload_as_dict", new_callable=MagicMock(return_value=payload_dict)
-        ):
+        mock_factory = MagicMock()
+        mock_factory.FromString.return_value = MagicMock()
+        mock_protocol = MagicMock()
+        mock_protocol.name = "position"
+        mock_protocol.protobufFactory = mock_factory
+
+        with patch("meshtastic.protocols", new={PortNum.POSITION_APP: mock_protocol}):
             processor = PBPacketProcessor(influx_client, service_envelope)
             data = processor.data
             assert isinstance(data, PositionPoint)
@@ -101,9 +101,14 @@ class TestPBPacketProcessor:
             "speed": 50,
             "time": 1609459200,
         }
+
+        mock_write_api = MagicMock()
+        mock_write_api.write.side_effect = ApiException(status=401)
+
         with patch.object(Position, "FromString", return_value=MagicMock()), patch.object(
-            PBPacketProcessor, "payload_as_dict", new_callable=MagicMock(return_value=payload_dict)
-        ), patch.object(influx_client, "write_api", return_value=MagicMock()) as mock_write_api:
+            PBPacketProcessor, "payload_dict", new_callable=MagicMock(return_value=payload_dict)
+        ), patch.object(influx_client, "write_api", return_value=mock_write_api) as mock_write_api:
+
             processor = PBPacketProcessor(influx_client, service_envelope)
             telemetry_data = processor.data
             processor.write_point(telemetry_data)
@@ -126,7 +131,7 @@ class TestPBPacketProcessor:
             "time": 1609459200,
         }
         with patch.object(Position, "FromString", return_value=MagicMock()), patch.object(
-            PBPacketProcessor, "payload_as_dict", new_callable=MagicMock(return_value=payload_dict)
+            PBPacketProcessor, "payload_dict", new_callable=MagicMock(return_value=payload_dict)
         ), patch.object(
             influx_client, "write_api", return_value=MagicMock(side_effect=ApiException(status=401))
         ) as mock_write_api:
