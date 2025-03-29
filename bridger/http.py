@@ -6,10 +6,17 @@ from bridger.meshtastic import DeviceModel
 
 VERSION = os.getenv("VERSION", "development")
 
-app = web.Application()
 routes = web.RouteTableDef()
 device = None
 session = None
+
+
+def create_app():
+    app = web.Application()
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
+    app.add_routes(routes)
+    return app
 
 
 async def on_startup(app):
@@ -24,6 +31,7 @@ async def on_cleanup(app):
 
 @routes.get("/")
 async def index_view(request):
+    app = request.app
     # Get list of routes and their methods
     routes_list = [(route.method, route.resource.canonical) for route in app.router.routes()]
     # Create HTML response
@@ -49,9 +57,5 @@ async def get_displaynames_all(request):
     return web.json_response(displaynames)
 
 
-app.on_startup.append(on_startup)
-app.on_cleanup.append(on_cleanup)
-app.add_routes(routes)
-
 if __name__ == "__main__":
-    web.run_app(app)
+    web.run_app(create_app())

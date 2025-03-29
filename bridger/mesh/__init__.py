@@ -2,6 +2,7 @@ import base64
 import os
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
+from dataclasses import fields
 from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
@@ -14,32 +15,14 @@ from meshtastic.protobuf.mesh_pb2 import Data
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import PortNum
 
+import bridger.mesh.handlers  # noqa: F401 # We need to import handlers to register them in the HANDLER_MAP
 from bridger.crypto import CryptoEngine
-from bridger.dataclasses import (
-    DeviceTelemetryPoint,
-    NeighborInfoPacket,
-    NodeInfoPoint,
-    PositionPoint,
-    PowerTelemetryPoint,
-    SensorTelemetryPoint,
-    TelemetryPoint,
-    TextMessagePoint,
-    TraceRoutePoint,
-)
+from bridger.dataclasses import TelemetryPoint
 from bridger.log import file_logger, logger
+from bridger.mesh.handler_registry import HANDLER_MAP
 
 INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
 INFLUXDB_V2_WRITE_PRECISION = os.getenv("INFLUXDB_V2_WRITE_PRECISION", "s")  # s, ms, us, or ns
-
-SUPPORTED_PACKET_TYPES = [
-    "text",
-    "position",
-    "user",
-    "telemetry",
-    "neighborinfo",
-    "traceroute",
-    "admin",
-]  # See meshtastic.protocols for the names of packet types
 
 
 class PacketProcessorError(Exception):
@@ -56,64 +39,9 @@ class PacketProcessor(ABC):
         self.service_envelope = service_envelope
         self.write_api = influx_client.write_api(write_options=SYNCHRONOUS)
 
-    measurement_data = {
-        NodeInfoPoint: ("node", ["long_name", "short_name", "hw_model", "role"], [], PortNum.NODEINFO_APP),
-        PositionPoint: (
-            "position",
-            [],
-            ["latitude_i", "longitude_i", "altitude", "precision_bits", "speed", "time"],
-            PortNum.POSITION_APP,
-        ),
-        SensorTelemetryPoint: (
-            "sensor",
-            [],
-            [
-                "air_util_tx",
-                "channel_utilization",
-                "barometric_pressure",
-                "current",
-                "gas_resistance",
-                "relative_humidity",
-                "temperature",
-                "voltage",
-            ],
-            PortNum.TELEMETRY_APP,
-        ),
-        DeviceTelemetryPoint: (
-            "battery",
-            [],
-            ["battery_level", "voltage", "air_util_tx", "channel_utilization", "uptime_seconds"],
-            PortNum.TELEMETRY_APP,
-        ),
-        NeighborInfoPacket: (
-            "neighbor",
-            ["neighbor_id", "node_id", "last_sent_by_id"],
-            ["snr", "node_broadcast_interval_secs"],
-            PortNum.NEIGHBORINFO_APP,
-        ),
-        PowerTelemetryPoint: (
-            "power",
-            ["channel"],
-            ["voltage", "current"],
-            PortNum.TELEMETRY_APP,
-        ),
-        TextMessagePoint: (
-            "message",
-            [],
-            [],
-            PortNum.TEXT_MESSAGE_APP,
-        ),
-        TraceRoutePoint: (
-            "traceroute",
-            [],
-            [],
-            PortNum.TRACEROUTE_APP,
-        ),
-    }
-
     @property
     @abstractmethod
-    def payload_as_dict(self):
+    def payload_dict(self):
         raise NotImplementedError
 
     @property
@@ -154,15 +82,24 @@ class PacketProcessor(ABC):
                 logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
 
     def write_point(self, telemetry_data: Union[TelemetryPoint, list[TelemetryPoint]]):
-        for telemetry_class, (measurement, tags, fields, port_num) in self.measurement_data.items():
-            if isinstance(telemetry_data, telemetry_class):
-                self.write_data(telemetry_data, measurement, fields, tags)
-                break
+        def extract_keys(cls):
+            tag_keys = []
+            field_keys = []
+            for f in fields(cls):
+                kind = f.metadata.get("influx_kind")
+                if kind == "tag":
+                    tag_keys.append(f.name)
+                elif kind == "field":
+                    field_keys.append(f.name)
+            return tag_keys, field_keys
 
-            # The InfluxDB write API can take a list of points
-            if isinstance(telemetry_data, list) and isinstance(telemetry_data[0], telemetry_class):
-                self.write_data(telemetry_data, measurement, fields, tags)
-                break
+        # Determine class
+        point_cls = type(telemetry_data[0]) if isinstance(telemetry_data, list) else type(telemetry_data)
+        measurement = getattr(point_cls, "measurement_name", None)
+        tag_keys, field_keys = extract_keys(point_cls)
+
+        if measurement:
+            self.write_data(telemetry_data, measurement, field_keys, tag_keys)
 
 
 # TODO: Implement a JSONPacketProcessor class to process packets that come in as JSON instead of protobuf
@@ -183,7 +120,7 @@ class PBPacketProcessor(PacketProcessor):
             self.decrypt()
 
     @property
-    def payload_as_dict(self):
+    def payload_dict(self):
         if isinstance(self.payload, str):
             # For text messages
             return {"text": self.payload}
@@ -211,7 +148,7 @@ class PBPacketProcessor(PacketProcessor):
 
     @property
     def payload(self) -> Union[Message, str, bytes]:
-        if self.portnum_friendly_name in SUPPORTED_PACKET_TYPES:
+        if self.portnum in HANDLER_MAP:
             payload = self.service_envelope.packet.decoded.payload
 
             # We check if there is a factory since some messages (liek text) don't have protobuf factories
@@ -233,7 +170,7 @@ class PBPacketProcessor(PacketProcessor):
         return self.service_envelope.packet.encrypted != b""
 
     @property
-    def data(self) -> Optional[Union[NodeInfoPoint, PositionPoint, SensorTelemetryPoint, DeviceTelemetryPoint]]:
+    def data(self) -> Union[TelemetryPoint, list[TelemetryPoint], None]:
         packet = self.service_envelope.packet
         point_data = {
             "_from": getattr(packet, "from"),
@@ -248,83 +185,24 @@ class PBPacketProcessor(PacketProcessor):
             "gateway_id": self.service_envelope.gateway_id,
         }
 
-        point_data.update(self.payload_as_dict)
+        point_data.update(self.payload_dict)
         logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 
+        logger.debug(f"HANDLER_MAP keys: {list(HANDLER_MAP.keys())}")
+        logger.debug(f"Resolved portnum: {self.portnum} (type: {type(self.portnum)})")
+
         try:
-            if self.portnum == PortNum.NODEINFO_APP:
-                return NodeInfoPoint(**point_data)
-            elif self.portnum == PortNum.POSITION_APP:
-                if ("latitude_i" in self.payload_as_dict and "longitude_i" in self.payload_as_dict) or self.force_decode:
-                    # The GPS time field ends up being used by InfluxDB as the record time so we need to rename it
-                    if point_data.get("time"):
-                        point_data["gps_time"] = point_data.pop("time", None)
+            for handler_cls in HANDLER_MAP.get(self.portnum, []):
+                handler = handler_cls(packet, self.payload_dict, point_data)
+                result = handler.handle()
+                if result:
+                    return result
 
-                    return PositionPoint(**point_data)
-                else:
-                    logger.bind(**self.payload_as_dict).debug("Latitude and longitude not found in payload")
-                    return None
-            elif self.portnum == PortNum.TELEMETRY_APP:
-                if "environment_metrics" in self.payload_as_dict:
-                    point_data.update(self.payload_as_dict["environment_metrics"])
-                    return SensorTelemetryPoint(**point_data)
-                elif "device_metrics" in self.payload_as_dict:
-                    point_data.update(self.payload_as_dict["device_metrics"])
-                    return DeviceTelemetryPoint(**point_data)
-                elif "power_metrics" in self.payload_as_dict:
-                    power_metrics = self.payload_as_dict["power_metrics"]
-                    power_points = []
-                    channels = set(key.split("_")[0] for key in power_metrics.keys())
+            logger.bind(portnum=self.portnum).warning(f"No matching handler for port number: {self.portnum}")
+            logger.debug(f"Payload: {self.payload_dict}")
+            return None
 
-                    for channel in channels:
-                        power_points.append(
-                            PowerTelemetryPoint(
-                                **point_data,
-                                channel=channel,
-                                voltage=power_metrics[f"{channel}_voltage"],
-                                current=power_metrics[f"{channel}_current"],
-                            )
-                        )
-                    return power_points
-            elif self.portnum == PortNum.NEIGHBORINFO_APP:
-                neighbors = [
-                    {"neighbor_id": neighbor.get("node_id", None), "snr": neighbor.get("snr", None)}
-                    for neighbor in point_data.get("neighbors", [])
-                ]
-
-                if not neighbors:
-                    logger.bind(**point_data).debug("No neighbors found in payload")
-                    return None
-
-                neighbor_points = []
-                point_data.pop("neighbors")
-
-                for neighbor in neighbors:
-                    point_data["neighbor_id"] = neighbor.get("neighbor_id")
-
-                    if neighbor.get("snr"):
-                        point_data["snr"] = neighbor.get("snr")
-
-                    neighbor_points.append(NeighborInfoPacket(**point_data))
-
-                return neighbor_points
-            elif self.portnum == PortNum.TEXT_MESSAGE_APP:
-                if isinstance(self.payload, str):
-                    # We are leaving out the actual text property here as we don't want to store actual messages
-                    return TextMessagePoint(**point_data)
-                return None
-            elif self.portnum == PortNum.ADMIN_APP:
-                pass
-            elif self.portnum == PortNum.ROUTING_APP:
-                pass
-            elif self.portnum == PortNum.TRACEROUTE_APP:
-                # TODO: The fields could be lists so we need to send each list item as a separate point
-                return TraceRoutePoint(**point_data)
-            else:
-                logger.bind(portnum=self.portnum).warning(f"Unknown port number: {self.portnum}")
-                logger.debug(f"Payload: {self.payload_as_dict}")
-                return None
-        except (AttributeError, KeyError) as e:
+        except (AttributeError, KeyError, TypeError) as e:
             logger.exception(f"{type(e).__name__}: {e}")
             return None
 
@@ -364,7 +242,7 @@ if __name__ == "__main__":
         logger.info(f"Service envelope: \n{service_envelope}")
 
         processor = PBPacketProcessor(influx_client, service_envelope, force_decode=True)
-        logger.info(f"Decoded packet: \n{processor.payload_as_dict}")
+        logger.info(f"Decoded packet: \n{processor.payload_dict}")
         logger.info(f"Data: {processor.data}")
 
     except PacketProcessorError as e:

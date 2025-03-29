@@ -12,91 +12,107 @@ class TelemetryPoint(ABC):
         if self.__class__ == TelemetryPoint:
             raise TypeError("Cannot instantiate abstract class.")
 
-    _from: int = field(metadata=config(field_name="from"))
-    to: int
-    packet_id: int = field(metadata=config(field_name="id"))
-    rx_time: int
-    rx_snr: float
-    rx_rssi: float
-    hop_limit: int
-    hop_start: int
-    channel_id: str
-    gateway_id: str
+    _from: int = field(metadata=config(field_name="from", metadata={"influx_kind": "tag"}))
+    to: int = field(metadata={"influx_kind": "tag"})
+    packet_id: int = field(metadata=config(field_name="id", metadata={"influx_kind": "field"}))
+    rx_time: int = field(metadata={"influx_kind": "field"})
+    rx_snr: float = field(metadata={"influx_kind": "field"})
+    rx_rssi: float = field(metadata={"influx_kind": "field"})
+    hop_limit: int = field(metadata={"influx_kind": "field"})
+    hop_start: int = field(metadata={"influx_kind": "field"})
+    channel_id: str = field(metadata={"influx_kind": "tag"})
+    gateway_id: str = field(metadata={"influx_kind": "tag"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class SensorTelemetryPoint(TelemetryPoint):
-    barometric_pressure: Optional[float] = None
-    current: Optional[float] = None
-    gas_resistance: Optional[float] = None
-    relative_humidity: Optional[float] = None
-    temperature: Optional[float] = None
-    voltage: Optional[float] = None
-    iaq: Optional[int] = None
-    channel_utilization: Optional[float] = None
+    measurement_name = "sensor"
+
+    barometric_pressure: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    current: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    gas_resistance: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    relative_humidity: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    temperature: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    voltage: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    iaq: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    channel_utilization: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class DeviceTelemetryPoint(TelemetryPoint):
-    battery_level: Optional[int] = None
-    voltage: Optional[float] = None
-    air_util_tx: Optional[float] = None
-    channel_utilization: Optional[float] = None
-    uptime_seconds: Optional[int] = None
+    measurement_name = "battery"
+
+    battery_level: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    voltage: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    air_util_tx: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    channel_utilization: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    uptime_seconds: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class NodeInfoPoint(TelemetryPoint):
+    measurement_name = "node"
+
     id: str
-    long_name: str
-    short_name: str
-    macaddr: Optional[str] = None
-    hw_model: Optional[str] = None
-    role: Optional[int] = None
+    long_name: str = field(metadata={"influx_kind": "tag"})
+    short_name: str = field(metadata={"influx_kind": "tag"})
+    macaddr: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    hw_model: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    role: Optional[int] = field(default=None, metadata={"influx_kind": "tag"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class PositionPoint(TelemetryPoint):
-    latitude_i: int
-    longitude_i: int
-    gps_time: Optional[str] = None
-    precision_bits: Optional[int] = None
-    altitude: Optional[int] = None
-    PDOP: Optional[int] = None
-    sats_in_view: Optional[int] = None
+    measurement_name = "position"
+
+    latitude_i: int = field(metadata={"influx_kind": "field"})
+    longitude_i: int = field(metadata={"influx_kind": "field"})
+    gps_time: Optional[str] = field(default=None, metadata={"influx_kind": "field"})
+    precision_bits: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    altitude: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    PDOP: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    sats_in_view: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class NeighborInfoPacket(TelemetryPoint):
-    node_id: int
-    last_sent_by_id: int
-    neighbor_id: int
-    node_broadcast_interval_secs: Optional[int] = None
-    snr: Optional[float] = None
+    measurement_name = "neighbor"
+
+    node_id: int = field(metadata={"influx_kind": "tag"})
+    last_sent_by_id: int = field(metadata={"influx_kind": "tag"})
+    neighbor_id: int = field(metadata={"influx_kind": "tag"})
+    node_broadcast_interval_secs: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    snr: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class PowerTelemetryPoint(TelemetryPoint):
-    voltage: Optional[float] = None
-    current: Optional[float] = None
-    channel: Optional[str] = None
+    measurement_name = "power"
+
+    voltage: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    current: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    channel: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class TextMessagePoint(TelemetryPoint):
+    measurement_name = "message"
+
     text: Optional[str] = None
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class TraceRoutePoint(TelemetryPoint):
+class TraceroutePoint(TelemetryPoint):
+    measurement_name = "traceroute"
+
     route: Optional[int] = None
     snr_towards: Optional[int] = None
     route_back: Optional[int] = None
