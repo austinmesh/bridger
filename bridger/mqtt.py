@@ -45,6 +45,12 @@ class BridgerMQTT(Client):
         )
         add_breadcrumb(level="info", data=breadcrumb_data, category="mqtt", message="Received message")
 
+        # Ignoring PKI messages for now as we cannot decrypt them without storing keys somewhere
+        pki_topic = MQTT_TOPIC.removesuffix("/#") + "/PKI/"
+        if message.topic.startswith(pki_topic):
+            logger.bind(**breadcrumb_data).debug("Ignoring PKI message")
+            return
+
         try:
             service_envelope = ServiceEnvelope.FromString(message.payload)
             packet_id = service_envelope.packet.id
