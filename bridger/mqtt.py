@@ -8,6 +8,7 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 
+from bridger.influx import InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
@@ -64,14 +65,15 @@ class BridgerMQTT(Client):
 
             self.message_queue.append(packet_id)  # Append packet_id to bounded deque
 
-            pb_processor = PBPacketProcessor(self.influx_client, service_envelope)
+            pb_processor = PBPacketProcessor(service_envelope)
+            influx_writer = InfluxWriter(self.influx_client)
             set_user({"id": getattr(service_envelope.packet, "from")})
 
             data = pb_processor.data
 
             if data:
                 logger.bind(envelope_id=packet_id).debug(f"Trying to write data: {data}")
-                pb_processor.write_point(data)
+                influx_writer.write_point(data)
             else:
                 logger.bind(envelope_id=packet_id).debug("No data to write")
 
