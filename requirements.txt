@@ -6,9 +6,9 @@
 #
 aiocache==0.12.3
     # via bridger (pyproject.toml)
-aiohappyeyeballs==2.4.4
+aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.11.11
+aiohttp==3.11.14
     # via
     #   bridger (pyproject.toml)
     #   discord-py
@@ -17,7 +17,7 @@ aiosignal==1.3.2
     # via aiohttp
 arrow==1.3.0
     # via bridger (pyproject.toml)
-attrs==25.1.0
+attrs==25.3.0
     # via aiohttp
 bleak==0.22.3
     # via meshtastic
@@ -30,15 +30,15 @@ cffi==1.17.1
     # via cryptography
 charset-normalizer==3.4.1
     # via requests
-coverage==7.6.10
+coverage==7.7.1
     # via pytest-cov
-cryptography==44.0.0
+cryptography==44.0.2
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
 dbus-fast==2.43.0
     # via bleak
-discord-py==2.4.0
+discord-py==2.5.2
     # via bridger (pyproject.toml)
 frozenlist==1.5.0
     # via
@@ -50,15 +50,15 @@ idna==3.10
     #   yarl
 influxdb-client==1.48.0
     # via bridger (pyproject.toml)
-iniconfig==2.0.0
+iniconfig==2.1.0
     # via pytest
 loguru==0.7.3
     # via bridger (pyproject.toml)
-marshmallow==3.26.0
+marshmallow==3.26.1
     # via dataclasses-json
-meshtastic==2.5.11
+meshtastic==2.6.0
     # via bridger (pyproject.toml)
-multidict==6.1.0
+multidict==6.2.0
     # via
     #   aiohttp
     #   yarl
@@ -73,11 +73,11 @@ paho-mqtt==2.1.0
     # via bridger (pyproject.toml)
 pluggy==1.5.0
     # via pytest
-propcache==0.2.1
+propcache==0.3.1
     # via
     #   aiohttp
     #   yarl
-protobuf==5.29.3
+protobuf==6.30.2
     # via
     #   bridger (pyproject.toml)
     #   meshtastic
@@ -87,7 +87,7 @@ pypubsub==4.0.3
     # via meshtastic
 pyserial==3.5
     # via meshtastic
-pytest==8.3.4
+pytest==8.3.5
     # via
     #   bridger (pyproject.toml)
     #   pytest-aiohttp
@@ -103,7 +103,7 @@ python-dateutil==2.9.0.post0
     # via
     #   arrow
     #   influxdb-client
-python-dotenv==1.0.1
+python-dotenv==1.1.0
     # via bridger (pyproject.toml)
 pyyaml==6.0.2
     # via meshtastic
@@ -116,7 +116,7 @@ requests==2.32.3
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.20.0
+sentry-sdk==2.24.1
     # via bridger (pyproject.toml)
 six==1.17.0
     # via python-dateutil
@@ -124,7 +124,7 @@ tabulate==0.9.0
     # via meshtastic
 types-python-dateutil==2.9.0.20241206
     # via arrow
-typing-extensions==4.12.2
+typing-extensions==4.13.0
     # via
     #   reactivex
     #   typing-inspect
