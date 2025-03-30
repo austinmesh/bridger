@@ -4,7 +4,7 @@ from aiohttp import ClientSession, web
 
 from bridger.meshtastic import DeviceModel
 
-VERSION = os.getenv("VERSION", "development")
+VERSION = os.getenv("SENTRY_RELEASE", "development")
 
 routes = web.RouteTableDef()
 device = None
@@ -34,7 +34,17 @@ async def index_view(request):
     app = request.app
     # Get list of routes and their methods
     routes_list = [(route.method, route.resource.canonical) for route in app.router.routes()]
-    # Create HTML response
+
+    if "application/json" in request.headers.get("Accept", ""):
+        routes_list = [{"method": method, "path": path} for method, path in routes_list]
+        return web.json_response(routes_list)
+
+    # return HTML response if not curl
+    if "curl" in request.headers.get("User-Agent", ""):
+        routes_list = [f"{method} {path}" for method, path in routes_list]
+        routes_list = "\n".join(routes_list)
+        return web.Response(text=routes_list, content_type="text/plain")
+
     html_response = "<h1>Bridger API</h1><ul>"
     for method, path in routes_list:
         html_response += f"<li>{method} {path}</li>"
@@ -55,6 +65,11 @@ async def get_displaynames(request):
 async def get_displaynames_all(request):
     displaynames = await device.get_all_displaynames()
     return web.json_response(displaynames)
+
+
+@routes.get("/health")
+async def health_check(request):
+    return web.json_response({"status": "ok", "version": VERSION})
 
 
 if __name__ == "__main__":
