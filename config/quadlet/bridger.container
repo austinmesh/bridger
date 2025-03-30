@@ -7,6 +7,7 @@ Image = ${IMAGE}
 Environment = INFLUXDB_V2_URL=http://influxdb:8086
 Environment = MQTT_BROKER=emqx
 Environment = LOG_PATH=/var/lib/bridger/logs/bridger.log
+Environment = TZ=America/Chicago
 EnvironmentFile = /home/andy/.config/bridger.env
 Network = bridger.network
 HostName = bridger
