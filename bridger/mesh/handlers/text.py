@@ -10,8 +10,8 @@ class TextHandler(PacketHandler):
     portnum = PortNum.TEXT_MESSAGE_APP
 
     def handle(self):
-        # The payload of text messages is just a string
-        if isinstance(self.payload, str):
+        if "text" in self.payload_dict:
             # We are leaving out the actual text property here as we don't want to store actual messages
+            self.base_data.pop("text", None)
             return TextMessagePoint(**self.base_data)
         return None

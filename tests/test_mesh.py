@@ -25,6 +25,7 @@ position2 = base64.b64decode(b"CkAN8w/QhBVk2BYMIhsIAxISDQAADRIVAADDxSXUEYZmuAEPN
 neighbor1 = base64.b64decode(b"CmENuoSLahX/////IkcIRxJDCLqJrtQGELqJrtQGGIQHIgsIhome5wgVAADAQCILCN6vs+wLFQAAMMEiCwi/w4qUBxUAAIDBIgsIqIjKqgUVAAB8wTWcQz5MPW5/hWZIBHgEEghMb25nRmFzdBoJITZhOGI4NGJh")  # noqa: E501
 node_info_encrypted = base64.b64decode(b"ClwN1bNHIBX/////GAgqMCjSKlNzvvW8rDUZjO5/jPMTm0NYltWLHRCbCDiPCP2nhV+/e6RjVuGMa5eBmNhm8zVpxh+dPbmG4GZFAADIQEgDYOX//////////wF4AxIITG9uZ0Zhc3QaCSEwYzE4YWFmNA==")  # noqa: E501
 power_packet_encrypted1 = base64.b64decode(b"CjMN9KoYDBX/////GAgqFY3Y05LhKIBqMwjwGuGN5o6s3xa8wjXB1YJfPcDN32ZIA1gKeAMSCExvbmdGYXN0GgkhMGMxOGFhZjQ=")  # noqa: E501
+text_pki_message1 = base64.b64decode(b"CkUNrblyoRX6jzHYKhb0yGmkfVrkb3IV3LoA5qiW1XZRw1gHNWPEqTA9WKroZ0UAAOBASANQAWDz//////////8BeAOIAQESA1BLSRoJITkzNGNjYzc0")  # noqa: E501
 # fmt: on
 
 
@@ -45,6 +46,12 @@ def crypto_engine():
 @pytest.fixture
 def service_envelope():
     envelope = ServiceEnvelope.FromString(position1)
+    return envelope
+
+
+@pytest.fixture
+def text_pki_service_envelope():
+    envelope = ServiceEnvelope.FromString(text_pki_message1)
     return envelope
 
 
@@ -185,3 +192,10 @@ class TestPBPacketProcessor:
         assert decrypted_data.macaddr == expected_data["macaddr"]
         assert decrypted_data.hw_model == expected_data["hw_model"]
         assert decrypted_data.role == expected_data["role"]
+
+    def test_pki_encrypted_text_message(self, text_pki_service_envelope: ServiceEnvelope, influx_client: MagicMock):
+        with pytest.raises(PacketProcessorError) as e:
+            processor = PBPacketProcessor(influx_client, text_pki_service_envelope)
+            processor.payload_dict
+            # Check if the exception message contains the expected text
+            assert "We cannot decrypt PKI messages" in str(e.value)

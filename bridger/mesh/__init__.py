@@ -158,6 +158,11 @@ class PBPacketProcessor(PacketProcessor):
                     return payload.decode("utf-8")
                 except UnicodeDecodeError:
                     return payload
+        elif self.service_envelope.channel_id == "PKI":
+            raise PacketProcessorError(
+                f"We cannot decrypt PKI messages: {self.service_envelope.packet}",
+                portnum=self.portnum,
+            )
         else:
             raise PacketProcessorError(
                 f"We cannot yet decode: {PortNum.Name(self.portnum)}",
@@ -187,13 +192,11 @@ class PBPacketProcessor(PacketProcessor):
         point_data.update(self.payload_dict)
         logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 
-        logger.debug(f"HANDLER_MAP keys: {list(HANDLER_MAP.keys())}")
-        logger.debug(f"Resolved portnum: {self.portnum} (type: {type(self.portnum)})")
-
         try:
             for handler_cls in HANDLER_MAP.get(self.portnum, []):
                 handler = handler_cls(packet, self.payload_dict, point_data)
                 result = handler.handle()
+
                 if result:
                     return result
 
@@ -207,6 +210,10 @@ class PBPacketProcessor(PacketProcessor):
 
     def decrypt(self) -> bool:
         if not self.encrypted:
+            return False
+
+        if self.service_envelope.channel_id == "PKI":
+            logger.debug("This is a PKI packet so we cannot decrypt it")
             return False
 
         encrypted_data = self.service_envelope.packet.encrypted
