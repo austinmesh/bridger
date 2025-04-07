@@ -101,7 +101,7 @@ pytest-aiohttp==1.1.0
     # via bridger (pyproject.toml)
 pytest-asyncio==0.26.0
     # via pytest-aiohttp
-pytest-cov==6.0.0
+pytest-cov==6.1.1
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
