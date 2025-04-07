@@ -1,6 +1,5 @@
 import os
 
-import arrow
 from discord import Embed, Interaction, app_commands
 from discord.ext import commands
 from discord.utils import get
@@ -10,7 +9,6 @@ from bridger.gateway import GatewayError, GatewayManagerEMQX, emqx
 from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
-TIMESTAMP_FORMAT = "h:mm:ss A ZZZ"
 QUERY_RECENT_PACKETS = """
 from(bucket: "meshtastic")
   |> range(start: -1h)
@@ -168,12 +166,10 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         else:
             records = tables[0].records
             record = max(records, key=lambda r: r.values.get("_time"))
-            time = arrow.get(record.values.get("_time")).to("local")
-            time_human = time.humanize()
-            time_stamp = time.format(TIMESTAMP_FORMAT)
+            packet_time = int(record.values.get("_time").timestamp())
 
             await ctx.response.send_message(
-                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at **{time_stamp}** ({time_human})",  # noqa: E501
+                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
                 ephemeral=True,
             )
 
