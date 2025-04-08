@@ -31,7 +31,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run isort
-        uses: isort/isort-action@v1.1.0
+        uses: isort/isort-action@v1.1.1
         id: isort
         with:
           configuration: --profile black --check-only --diff -l 125 --verbose
