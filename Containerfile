@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.12
+FROM public.ecr.aws/docker/library/python:3.12.9
 ARG release
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt

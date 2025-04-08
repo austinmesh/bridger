@@ -1,4 +1,4 @@
-FROM python:3.9.21-alpine
+FROM public.ecr.aws/docker/library/python:3.9.21-alpine
 RUN apk add --no-cache py3-pip
 RUN python3 -m venv /app
 ENV PATH="/app/bin:$PATH"
