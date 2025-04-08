@@ -8,12 +8,12 @@ aiocache==0.12.3
     # via bridger (pyproject.toml)
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.11.14
+aiohttp==3.11.16
     # via
     #   bridger (pyproject.toml)
     #   discord-py
     #   pytest-aiohttp
-aiomqtt==2.3.0
+aiomqtt==2.3.1
     # via bridger (pyproject.toml)
 aiosignal==1.3.2
     # via aiohttp
@@ -30,13 +30,13 @@ cffi==1.17.1
     # via cryptography
 charset-normalizer==3.4.1
     # via requests
-coverage==7.7.1
+coverage==7.8.0
     # via pytest-cov
 cryptography==44.0.2
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
-dbus-fast==2.43.0
+dbus-fast==2.44.1
     # via bleak
 discord-py==2.5.2
     # via bridger (pyproject.toml)
@@ -56,9 +56,9 @@ loguru==0.7.3
     # via bridger (pyproject.toml)
 marshmallow==3.26.1
     # via dataclasses-json
-meshtastic==2.6.0
+meshtastic==2.6.1
     # via bridger (pyproject.toml)
-multidict==6.2.0
+multidict==6.3.2
     # via
     #   aiohttp
     #   yarl
@@ -99,7 +99,7 @@ pytest-aiohttp==1.1.0
     # via bridger (pyproject.toml)
 pytest-asyncio==0.26.0
     # via pytest-aiohttp
-pytest-cov==6.0.0
+pytest-cov==6.1.1
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via influxdb-client
@@ -116,24 +116,24 @@ requests==2.32.3
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.24.1
+sentry-sdk==2.25.1
     # via bridger (pyproject.toml)
 six==1.17.0
     # via python-dateutil
 tabulate==0.9.0
     # via meshtastic
-typing-extensions==4.13.0
+typing-extensions==4.13.1
     # via
     #   reactivex
     #   typing-inspect
 typing-inspect==0.9.0
     # via dataclasses-json
-urllib3==2.2.3
+urllib3==2.3.0
     # via
     #   influxdb-client
     #   requests
     #   sentry-sdk
-yarl==1.18.3
+yarl==1.19.0
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
