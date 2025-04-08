@@ -101,10 +101,11 @@ jobs:
       - name: Set image tags
         id: set_tags
         run: |
-          echo "tags=ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:$BRANCH_NAME" >> $GITHUB_OUTPUT
+          TAGS="ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:$BRANCH_NAME"
           if [ "$BRANCH_NAME" == "main" ]; then
-            echo "tags=ghcr.io/${{ github.repository }}:${{ github.sha }} ghcr.io/${{ github.repository }}:$BRANCH_NAME ghcr.io/${{ github.repository }}:latest" >> $GITHUB_OUTPUT
+            TAGS="$TAGS ghcr.io/${{ github.repository }}:latest"
           fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build bridger image
         id: build_image
