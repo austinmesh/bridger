@@ -22,6 +22,9 @@ class TelemetryHandler(PacketHandler):
             channels = set(key.split("_")[0] for key in power_metrics.keys())
 
             for channel in channels:
+                if f"{channel}_voltage" not in power_metrics or f"{channel}_current" not in power_metrics:
+                    continue
+
                 power_points.append(
                     PowerTelemetryPoint(
                         **self.base_data,
