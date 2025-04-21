@@ -133,7 +133,7 @@ urllib3==2.4.0
     #   influxdb-client
     #   requests
     #   sentry-sdk
-yarl==1.19.0
+yarl==1.20.0
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
