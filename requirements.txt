@@ -40,7 +40,7 @@ dbus-fast==2.44.1
     # via bleak
 discord-py==2.5.2
     # via bridger (pyproject.toml)
-frozenlist==1.5.0
+frozenlist==1.6.0
     # via
     #   aiohttp
     #   aiosignal
