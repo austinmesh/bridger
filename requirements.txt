@@ -116,7 +116,7 @@ requests==2.32.3
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.25.1
+sentry-sdk==2.26.1
     # via bridger (pyproject.toml)
 six==1.17.0
     # via python-dateutil
