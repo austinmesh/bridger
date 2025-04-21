@@ -54,7 +54,7 @@ iniconfig==2.1.0
     # via pytest
 loguru==0.7.3
     # via bridger (pyproject.toml)
-marshmallow==3.26.1
+marshmallow==4.0.0
     # via dataclasses-json
 meshtastic==2.6.1
     # via bridger (pyproject.toml)
