@@ -64,7 +64,7 @@ multidict==6.4.3
     #   yarl
 mypy-extensions==1.0.0
     # via typing-inspect
-packaging==24.2
+packaging==25.0
     # via
     #   marshmallow
     #   meshtastic
