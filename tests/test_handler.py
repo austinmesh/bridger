@@ -14,7 +14,7 @@ def test_handler_decorator_registers_class():
         portnum = PortNum.TEXT_MESSAGE_APP
 
     handler(DummyHandler)
-    assert DummyHandler in HANDLER_MAP[PortNum.TEXT_MESSAGE_APP]
+    assert DummyHandler is HANDLER_MAP[PortNum.TEXT_MESSAGE_APP]
 
 
 def test_handler_decorator_raises_if_missing_portnum():

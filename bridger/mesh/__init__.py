@@ -126,7 +126,8 @@ class PBPacketProcessor(PacketProcessor):
         logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 
         try:
-            for handler_cls in HANDLER_MAP.get(self.portnum, []):
+            if self.portnum in HANDLER_MAP:
+                handler_cls = HANDLER_MAP[self.portnum]
                 handler = handler_cls(
                     packet, self.payload_dict, point_data, strip_text=self.strip_text, force_decode=self.force_decode
                 )
@@ -134,6 +135,11 @@ class PBPacketProcessor(PacketProcessor):
 
                 if result:
                     return result
+                else:
+                    logger.bind(portnum=self.portnum).debug(
+                        f"Handler {str(handler)} didn't return us a result: {self.portnum}"
+                    )
+                    return None
 
             logger.bind(portnum=self.portnum).warning(f"No matching handler for port number: {self.portnum}")
             logger.debug(f"Payload: {self.payload_dict}")
