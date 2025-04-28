@@ -8,7 +8,7 @@ Environment = GF_AUTH_ANONYMOUS_ORG_NAME="Austin Mesh"
 Environment = GF_AUTH_ANONYMOUS_HIDE_VERSION=true
 Environment = GF_SECURITY_ALLOW_EMBEDDING=true
 Environment = GF_SERVER_ROOT_URL=https://graphs.austinmesh.org/
-Environment = GF_RENDERING_SERVER_URL=http://image-renderer:8084/render
+Environment = GF_RENDERING_SERVER_URL=http://image-renderer:8088/render
 Environment = GF_RENDERING_CALLBACK_URL=http://grafana:3000/
 Network = bridger.network
 HostName = grafana
