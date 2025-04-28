@@ -127,7 +127,9 @@ class PBPacketProcessor(PacketProcessor):
 
         try:
             for handler_cls in HANDLER_MAP.get(self.portnum, []):
-                handler = handler_cls(packet, self.payload_dict, point_data, strip_text=self.strip_text)
+                handler = handler_cls(
+                    packet, self.payload_dict, point_data, strip_text=self.strip_text, force_decode=self.force_decode
+                )
                 result = handler.handle()
 
                 if result:

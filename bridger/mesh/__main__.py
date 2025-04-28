@@ -19,7 +19,7 @@ if __name__ == "__main__":
         service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
         logger.info(f"Service envelope: \n{service_envelope}")
 
-        processor = PBPacketProcessor(influx_client, service_envelope, force_decode=True)
+        processor = PBPacketProcessor(service_envelope, force_decode=True)
         logger.info(f"Decoded packet: \n{processor.payload_dict}")
         logger.info(f"Data: {processor.data}")
 
