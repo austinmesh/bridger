@@ -3,6 +3,8 @@ Image = public.ecr.aws/bitnami/grafana-image-renderer:3.12.5
 PublishPort = 8088:8088
 Environment = HTTP_PORT=8088
 Environment = HTTP_HOST=0.0.0.0
+Environment = XDG_CONFIG_HOME=/tmp/.chromium
+Environment = XDG_CACHE_HOME=/tmp/.chromium
 Network = bridger.network
 HostName = image-renderer
 
