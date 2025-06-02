@@ -66,9 +66,8 @@ class TestPBPacketProcessor:
     def test_init_failure(self, service_envelope: ServiceEnvelope):
         modified_envelope = ServiceEnvelope.FromString(node_info2)
         modified_envelope.packet.decoded.portnum = 6
-        with pytest.raises(PacketProcessorError):
-            processor = PBPacketProcessor(modified_envelope)
-            processor.payload
+        processor = PBPacketProcessor(modified_envelope)
+        assert processor.payload is None
 
     def test_payload_dict(self, service_envelope: ServiceEnvelope):
         with patch.object(Position, "FromString", return_value=MagicMock()):

@@ -80,7 +80,7 @@ class PBPacketProcessor(PacketProcessor):
         return getattr(self.portnum_protocol, "name", None)
 
     @property
-    def payload(self) -> Union[Message, str, bytes]:
+    def payload(self) -> Optional[Union[Message, str, bytes]]:
         if self.portnum in HANDLER_MAP:
             payload = self.service_envelope.packet.decoded.payload
 
@@ -97,10 +97,10 @@ class PBPacketProcessor(PacketProcessor):
                 portnum=self.portnum,
             )
         else:
-            raise PacketProcessorError(
-                f"We cannot yet decode: {PortNum.Name(self.portnum)}",
-                portnum=self.portnum,
+            logger.bind(portnum=self.portnum, packet=self.service_envelope.packet).warning(
+                f"Received unknown PortNum value: {self.portnum}. Skipping packet."
             )
+            return None
 
     @property
     def encrypted(self) -> bool:
