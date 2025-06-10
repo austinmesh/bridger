@@ -54,7 +54,12 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
         embed = Embed(color=color)
         # Try to get node info for the gateway hex ID
-        node_info = self.influx_reader.get_node_info(int(gateway.strip("!"), 16))
+        try:
+            gateway_id = int(gateway.strip("!"), 16)
+            node_info = self.influx_reader.get_node_info(gateway_id)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Failed to parse gateway ID '{gateway}': {e}")
+            node_info = None
         short = node_info.get("short_name") if node_info else None
         long = node_info.get("long_name") if node_info else None
         if short and long:
