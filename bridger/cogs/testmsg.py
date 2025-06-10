@@ -40,8 +40,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel = self.bot.get_channel(self.discord_channel_id)
         logger.info(f"TestMsg cog is ready and channel is: {self.discord_channel}")
 
-    @staticmethod
-    def create_embed(service_envelope: ServiceEnvelope):
+    def create_embed(self, service_envelope: ServiceEnvelope):
         packet = service_envelope.packet
         gateway = service_envelope.gateway_id
         color = int(gateway[-6:], 16)
@@ -54,8 +53,14 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             hop_count = packet.hop_start - packet.hop_limit
 
         embed = Embed(color=color)
-        # embed.set_author(name=gateway)
-        embed.description = f"Heard by **{gateway}** at {formatted_time}"
+        # Try to get node info for the gateway hex ID
+        node_info = self.influx_reader.get_node_info(int(gateway.strip("!"), 16))
+        short = node_info.get("short_name") if node_info else None
+        long = node_info.get("long_name") if node_info else None
+        if short and long:
+            embed.description = f"Heard by **{short}** ({long}) [**{gateway}**] at {formatted_time}"
+        else:
+            embed.description = f"Heard by **{gateway}** at {formatted_time}"
         embed.add_field(name="SNR", value=snr, inline=True)
         embed.add_field(name="RSSI", value=rssi, inline=True)
 
