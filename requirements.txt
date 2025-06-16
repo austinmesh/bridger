@@ -8,7 +8,7 @@ aiocache==0.12.3
     # via bridger (pyproject.toml)
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.12
+aiohttp==3.12.13
     # via
     #   bridger (pyproject.toml)
     #   discord-py
@@ -21,7 +21,7 @@ attrs==25.3.0
     # via aiohttp
 bleak==0.22.3
     # via meshtastic
-certifi==2025.4.26
+certifi==2025.6.15
     # via
     #   influxdb-client
     #   requests
@@ -30,7 +30,7 @@ cffi==1.17.1
     # via cryptography
 charset-normalizer==3.4.2
     # via requests
-coverage==7.8.2
+coverage==7.9.1
     # via pytest-cov
 cryptography==45.0.4
     # via bridger (pyproject.toml)
@@ -74,7 +74,9 @@ paho-mqtt==2.1.0
     #   aiomqtt
     #   bridger (pyproject.toml)
 pluggy==1.6.0
-    # via pytest
+    # via
+    #   pytest
+    #   pytest-cov
 propcache==0.3.2
     # via
     #   aiohttp
@@ -101,7 +103,7 @@ pytest-aiohttp==1.1.0
     # via bridger (pyproject.toml)
 pytest-asyncio==1.0.0
     # via pytest-aiohttp
-pytest-cov==6.1.1
+pytest-cov==6.2.1
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via influxdb-client
@@ -118,7 +120,7 @@ requests==2.32.4
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.29.1
+sentry-sdk==2.30.0
     # via bridger (pyproject.toml)
 six==1.17.0
     # via python-dateutil
