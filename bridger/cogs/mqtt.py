@@ -1,11 +1,17 @@
 import os
+import re
+import time
+from datetime import datetime, timezone
+from typing import List, Literal, Optional
 
 from discord import ButtonStyle, Embed, Interaction, app_commands, ui
 from discord.ext import commands
 from discord.utils import get
 from influxdb_client import InfluxDBClient
 
+from bridger.dataclasses import AnnotationPoint
 from bridger.gateway import GatewayError, GatewayManagerEMQX, emqx
+from bridger.influx.interfaces import InfluxReader, InfluxWriter
 from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
@@ -21,49 +27,109 @@ from(bucket: "meshtastic")
 
 influx_client: InfluxDBClient = InfluxDBClient.from_env_properties()
 query_client = influx_client.query_api()
+influx_reader = InfluxReader(influx_client)
+
+
+async def node_id_autocomplete(interaction: Interaction, current: str) -> List[app_commands.Choice[str]]:
+    """Autocomplete function for node_id parameter."""
+    try:
+        logger.debug(f"Autocomplete called with current='{current}'")
+
+        # Get all known node IDs with display names from InfluxDB
+        nodes = influx_reader.get_all_node_ids()
+        logger.debug(f"Found {len(nodes)} nodes from InfluxDB")
+
+        # Filter based on what user has typed so far
+        if current:
+            # Remove leading ! if present for filtering
+            current_clean = current.lstrip("!").lower()
+            filtered_nodes = [
+                node for node in nodes if (current_clean in node["value"].lower() or current_clean in node["name"].lower())
+            ]
+            logger.debug(f"Filtered to {len(filtered_nodes)} nodes matching '{current_clean}'")
+        else:
+            filtered_nodes = nodes[:25]  # Limit even when no filter
+            logger.debug(f"No filter provided, showing first {len(filtered_nodes)} nodes")
+
+        # Limit to 25 choices (Discord limit)
+        choices = []
+        for node in filtered_nodes[:25]:
+            # Use the name for display and value for the actual parameter
+            choices.append(app_commands.Choice(name=node["name"], value=node["value"]))
+
+        logger.debug(f"Returning {len(choices)} choices for autocomplete")
+        return choices
+    except Exception as e:
+        logger.error(f"Error in node_id autocomplete: {e}")
+        # Return empty list on error rather than None to avoid Discord API errors
+        return []
 
 
 def check_gateway_owner(interaction: Interaction) -> bool:
+    """Check if the user owns the gateway specified in the node_id parameter."""
     node_id = None
-    gateway_manager = GatewayManagerEMQX(emqx)
 
     logger.debug(f"Interaction data: {interaction.data}")
 
+    # Extract node_id from interaction options
     if "options" in interaction.data:
-        # Look through nested options
         for option in interaction.data["options"]:
             if "options" in option:
                 for sub_option in option["options"]:
                     if sub_option["name"] == "node_id":
                         node_id = sub_option["value"]
                         break
+            # Also check direct options (not nested)
+            elif option.get("name") == "node_id":
+                node_id = option["value"]
+                break
 
     if not node_id:
+        logger.warning("node_id not found in command options")
         raise ValueError("node_id not found in the command options")
 
-    logger.debug(f"Node ID: {node_id}")
+    # Normalize node_id (remove leading !)
+    normalized_node_id = node_id.lstrip("!")
+    logger.debug(f"Checking ownership for node ID: {normalized_node_id}")
 
     try:
-        gateway = gateway_manager.get_gateway(node_id)
+        gateway_manager = GatewayManagerEMQX(emqx)
+        gateway = gateway_manager.get_gateway(normalized_node_id)
         owner = interaction.client.get_user(gateway.owner_id)
+
+        if not owner:
+            logger.warning(f"Could not find owner user with ID {gateway.owner_id}")
+            return False
+
+        is_owner = owner == interaction.user
+        logger.debug(f"User {interaction.user} is owner: {is_owner}")
+        return is_owner
+
     except ValueError as e:
-        raise app_commands.AppCommandError(f"Error retrieving gateway: {e}")
-
-    logger.debug(f"Gateway owner: {owner}")
-    logger.debug(f"Interaction user: {interaction.user}")
-
-    compared = owner == interaction.user
-
-    logger.debug(f"Owner and interaction user compared: {compared}")
-
-    return owner == interaction.user
+        logger.warning(f"Gateway not found for node {normalized_node_id}: {e}")
+        # Don't raise here - let the calling command handle the error
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error checking gateway ownership: {e}")
+        return False
 
 
-def is_bridger_admin_or_owner(interaction: Interaction):
+def is_bridger_admin_or_owner(interaction: Interaction) -> bool:
+    """Check if user is either a Bridger admin or owns the gateway in question."""
+    # Check admin role first (more efficient)
     bridger_admin_role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
-    if bridger_admin_role in interaction.user.roles or check_gateway_owner(interaction):
+    if bridger_admin_role and bridger_admin_role in interaction.user.roles:
+        logger.debug(f"User {interaction.user} has admin role")
         return True
-    return False
+
+    # If not admin, check if they own the specific gateway
+    try:
+        is_owner = check_gateway_owner(interaction)
+        logger.debug(f"User {interaction.user} gateway ownership check: {is_owner}")
+        return is_owner
+    except Exception as e:
+        logger.warning(f"Error checking gateway ownership: {e}")
+        return False
 
 
 class GatewayPaginationView(ui.View):
@@ -159,14 +225,16 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.describe(
         node_id="The hex node ID to request an account for. With or without the preceding ! such as !cbaf0421 or cbaf0421"
     )
+    @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def request_account(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
         message = f"Gateway created for node **{gateway.node_hex_id}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
 
         await ctx.response.send_message(message, ephemeral=True)
 
-    @app_commands.checks.has_role(BRIDGER_ADMIN_ROLE)
+    @app_commands.check(is_bridger_admin_or_owner)
     @app_commands.command(name="delete-account", description="Delete MQTT account")
+    @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def delete_account(self, ctx: Interaction, node_id: str):
         if self.gateway_manager.delete_gateway_user(node_id):
             await ctx.response.send_message(f"Gateway deleted: {node_id}", ephemeral=True, delete_after=self.delete_after)
@@ -215,6 +283,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
     @app_commands.check(check_gateway_owner)
     @app_commands.command(name="reset-password", description="Reset MQTT account password")
+    @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def reset_password(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.reset_gateway_password(node_id, ctx.user)
 
@@ -224,6 +293,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         )
 
     @app_commands.command(name="is-alive", description="Check if MQTT gateway is alive and receiving packets")
+    @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def is_alive(self, ctx: Interaction, node_id: str):
         gateway = self.gateway_manager.get_gateway(node_id)
         tables = query_client.query(QUERY_RECENT_PACKETS.format(gateway.node_hex_id_with_bang))
@@ -241,6 +311,186 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                 f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
                 ephemeral=True,
             )
+
+    @app_commands.check(is_bridger_admin_or_owner)
+    @app_commands.command(name="add-annotation", description="Add an annotation for Grafana")
+    @app_commands.describe(
+        node_id="The hex node ID to annotate. With or without the preceding ! such as !cbaf0421 or cbaf0421",
+        annotation_type="The type of annotation",
+        text="Description text for the annotation",
+        start_time="Start time (optional). Formats: Unix timestamp, ISO (2024-01-01T12:00:00Z), "
+        "date (2024-01-01), or relative (+1h, +30m, +2d). Defaults to now.",
+        end_time="End time (optional). Same formats as start_time. Leave empty for point-in-time annotation.",
+    )
+    @app_commands.autocomplete(node_id=node_id_autocomplete)
+    async def add_annotation(
+        self,
+        ctx: Interaction,
+        node_id: str,
+        annotation_type: Literal[
+            "general_maintenance",
+            "reposition",
+            "configuration_change",
+            "power_cycle",
+            "antenna_adjustment",
+            "firmware_update",
+            "hardware_issue",
+        ],
+        text: str,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+    ):
+        # Normalize node_id to hex format without !
+        normalized_node_id = node_id.lstrip("!")
+
+        # Parse time parameters
+        parsed_start_time = None
+        parsed_end_time = None
+
+        if start_time:
+            parsed_start_time = parse_time_string(start_time)
+            if parsed_start_time is None:
+                await ctx.response.send_message(
+                    f"Invalid start_time format: '{start_time}'. "
+                    "Use Unix timestamp, ISO format (2024-01-01T12:00:00Z), "
+                    "date (2024-01-01), or relative (+1h, +30m, +2d).",
+                    ephemeral=True,
+                    delete_after=self.delete_after,
+                )
+                return
+
+        if end_time:
+            parsed_end_time = parse_time_string(end_time)
+            if parsed_end_time is None:
+                await ctx.response.send_message(
+                    f"Invalid end_time format: '{end_time}'. "
+                    "Use Unix timestamp, ISO format (2024-01-01T12:00:00Z), "
+                    "date (2024-01-01), or relative (+1h, +30m, +2d).",
+                    ephemeral=True,
+                    delete_after=self.delete_after,
+                )
+                return
+
+        # Validate that end_time is after start_time if both are provided
+        if parsed_start_time and parsed_end_time and parsed_end_time <= parsed_start_time:
+            await ctx.response.send_message(
+                "End time must be after start time.", ephemeral=True, delete_after=self.delete_after
+            )
+            return
+
+        # Check if user has permission for this specific node (for non-admins)
+        bridger_admin_role = get(ctx.guild.roles, name=BRIDGER_ADMIN_ROLE)
+        if bridger_admin_role not in ctx.user.roles:
+            # For non-admins, verify they own this specific node
+            gateway_manager = GatewayManagerEMQX(emqx)
+            try:
+                gateway = gateway_manager.get_gateway(normalized_node_id)
+                owner = ctx.client.get_user(gateway.owner_id)
+                if owner != ctx.user:
+                    await ctx.response.send_message(
+                        "You can only add annotations for nodes you own.", ephemeral=True, delete_after=self.delete_after
+                    )
+                    return
+            except ValueError:
+                await ctx.response.send_message(
+                    f"Node {normalized_node_id} not found or you don't have permission to annotate it.",
+                    ephemeral=True,
+                    delete_after=self.delete_after,
+                )
+                return
+
+        # Create the annotation
+        annotation = AnnotationPoint(
+            node_id=normalized_node_id,
+            annotation_type=annotation_type,
+            body=text,
+            title=f"{normalized_node_id}: {annotation_type.replace('_', ' ').title()}",
+            author=ctx.user.display_name,
+            start_time=parsed_start_time,  # Will default to now() in write_annotation if None
+            end_time=parsed_end_time,
+        )
+
+        # Write to InfluxDB
+        try:
+            influx_client = InfluxDBClient.from_env_properties()
+            writer = InfluxWriter(influx_client)
+            writer.write_annotation(annotation)
+
+            # Build response message
+            response_msg = f"Annotation added for node **{normalized_node_id}**:\n"
+            response_msg += f"Type: **{annotation_type}**\n"
+            response_msg += f"Text: {text}\n"
+
+            # Add timing information
+            if parsed_start_time:
+                response_msg += f"Start: <t:{parsed_start_time}> (<t:{parsed_start_time}:R>)\n"
+            else:
+                response_msg += "Start: Now\n"
+
+            if parsed_end_time:
+                response_msg += f"End: <t:{parsed_end_time}> (<t:{parsed_end_time}:R>)"
+            else:
+                response_msg += "End: Not specified (point-in-time annotation)"
+
+            await ctx.response.send_message(response_msg, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Failed to write annotation: {e}")
+            await ctx.response.send_message(
+                f"Failed to add annotation: {str(e)}", ephemeral=True, delete_after=self.delete_after
+            )
+
+
+def parse_time_string(time_str: str) -> Optional[int]:
+    """Parse various time string formats to Unix timestamp.
+
+    Supported formats:
+    - Unix timestamp: 1640995200
+    - ISO format: 2022-01-01T00:00:00Z or 2022-01-01T00:00:00
+    - Date only: 2022-01-01 (assumes 00:00:00 UTC)
+    - Relative: +1h, +30m, +2d (relative to now)
+    """
+    if not time_str:
+        return None
+
+    time_str = time_str.strip()
+
+    try:
+        # Try parsing as Unix timestamp
+        if time_str.isdigit():
+            return int(time_str)
+
+        # Try parsing relative time (+1h, +30m, +2d, etc.)
+        relative_match = re.match(r"^([+-]?)(\d+)([hdmw])$", time_str.lower())
+        if relative_match:
+            sign, amount, unit = relative_match.groups()
+            amount = int(amount)
+            if sign == "-":
+                amount = -amount
+
+            multipliers = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+            offset_seconds = amount * multipliers.get(unit, 0)
+            return int(time.time()) + offset_seconds
+
+        # Try parsing ISO format
+        if "T" in time_str:
+            if time_str.endswith("Z"):
+                dt = datetime.fromisoformat(time_str[:-1] + "+00:00")
+            elif "+" in time_str or time_str.count("-") > 2:
+                dt = datetime.fromisoformat(time_str)
+            else:
+                # Assume UTC if no timezone
+                dt = datetime.fromisoformat(time_str).replace(tzinfo=timezone.utc)
+            return int(dt.timestamp())
+
+        # Try parsing date only (YYYY-MM-DD)
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", time_str):
+            dt = datetime.fromisoformat(time_str + "T00:00:00").replace(tzinfo=timezone.utc)
+            return int(dt.timestamp())
+
+    except (ValueError, OverflowError) as e:
+        logger.warning(f"Failed to parse time string '{time_str}': {e}")
+
+    return None
 
 
 async def setup(bot):
