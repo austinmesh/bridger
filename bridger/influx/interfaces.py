@@ -76,11 +76,19 @@ class InfluxReader:
 
         try:
             tables = self.query_data(query)
-            if not tables:
-                return []
+        except ApiException as e:
+            logger.error(f"Error querying InfluxDB for node IDs: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error during query execution: {e}")
+            return []
 
-            nodes = []
-            seen_values = set()
+        if not tables:
+            return []
+
+        nodes = []
+        seen_values = set()
+        try:
             for table in tables:
                 for record in table.records:
                     value = record.values.get("_value")
