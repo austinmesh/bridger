@@ -403,7 +403,6 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         # Write to InfluxDB
         try:
-            influx_client = InfluxDBClient.from_env_properties()
             writer = InfluxWriter(influx_client)
             writer.write_annotation(annotation)
 
