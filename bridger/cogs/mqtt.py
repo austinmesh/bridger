@@ -1,6 +1,6 @@
 import os
 
-from discord import Embed, Interaction, app_commands
+from discord import ButtonStyle, Embed, Interaction, app_commands, ui
 from discord.ext import commands
 from discord.utils import get
 from influxdb_client import InfluxDBClient
@@ -66,6 +66,62 @@ def is_bridger_admin_or_owner(interaction: Interaction):
     return False
 
 
+class GatewayPaginationView(ui.View):
+    def __init__(self, gateways, bot, *, timeout=300):
+        super().__init__(timeout=timeout)
+        self.gateways = gateways
+        self.bot = bot
+        self.current_page = 0
+        self.max_page = (len(gateways) - 1) // 25  # 25 fields per page
+
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.previous_button.disabled = self.current_page == 0
+        self.next_button.disabled = self.current_page == self.max_page
+
+    def get_page_embed(self):
+        start_idx = self.current_page * 25
+        end_idx = min(start_idx + 25, len(self.gateways))
+        page_gateways = self.gateways[start_idx:end_idx]
+
+        embed = Embed(description="Currently provisioned gateways:", color=0x6CEB94)
+
+        for gateway in page_gateways:
+            owner = self.bot.get_user(gateway.owner_id)
+            owner_name = owner.name if owner else "Unknown"
+
+            embed.add_field(
+                name="Gateway",
+                value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                inline=False,
+            )
+
+        embed.set_footer(text=f"Page {self.current_page + 1} of {self.max_page + 1} • Total gateways: {len(self.gateways)}")
+
+        return embed
+
+    @ui.button(label="Previous", style=ButtonStyle.secondary, emoji="⬅️")
+    async def previous_button(self, interaction: Interaction, button: ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_buttons()
+            embed = self.get_page_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    @ui.button(label="Next", style=ButtonStyle.secondary, emoji="➡️")
+    async def next_button(self, interaction: Interaction, button: ui.Button):
+        if self.current_page < self.max_page:
+            self.current_page += 1
+            self.update_buttons()
+            embed = self.get_page_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+
 class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     delete_after = None
 
@@ -126,23 +182,36 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             await ctx.response.send_message(content="There are no provisioned gateways in the system.", ephemeral=True)
             return
 
-        embed = Embed(description="Currently provisioned gateways:", color=0x6CEB94)
+        if len(gateways) <= 25:
+            # Simple embed for 25 or fewer gateways
+            embed = Embed(description="Currently provisioned gateways:", color=0x6CEB94)
 
-        for gateway in gateways:
-            owner = self.bot.get_user(gateway.owner_id)
-            owner_name = owner.name if owner else "Unknown"
+            for gateway in gateways:
+                owner = self.bot.get_user(gateway.owner_id)
+                owner_name = owner.name if owner else "Unknown"
 
-            embed.add_field(
-                name="Gateway",
-                value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
-                inline=False,
+                embed.add_field(
+                    name="Gateway",
+                    value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                    inline=False,
+                )
+
+            await ctx.response.send_message(
+                content=f"There are {len(gateways)} provisioned gateways in the system.",
+                embed=embed,
+                ephemeral=True,
             )
+        else:
+            # Use pagination for more than 25 gateways
+            view = GatewayPaginationView(gateways, self.bot)
+            embed = view.get_page_embed()
 
-        await ctx.response.send_message(
-            content=f"There are {len(gateways)} provisioned gateways in the system.",
-            embed=embed,
-            ephemeral=True,
-        )
+            await ctx.response.send_message(
+                content=f"There are {len(gateways)} provisioned gateways in the system.",
+                embed=embed,
+                view=view,
+                ephemeral=True,
+            )
 
     @app_commands.check(check_gateway_owner)
     @app_commands.command(name="reset-password", description="Reset MQTT account password")
