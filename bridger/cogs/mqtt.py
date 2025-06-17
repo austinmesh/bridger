@@ -15,15 +15,6 @@ from bridger.influx.interfaces import InfluxReader, InfluxWriter
 from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
-QUERY_RECENT_PACKETS = """
-from(bucket: "meshtastic")
-  |> range(start: -1h)
-  |> filter(fn: (r) => r["gateway_id"] == "{}")
-  |> filter(fn: (r) => r["_field"] == "packet_id")
-  |> keep(columns: ["_from", "_time", "_measurement"])
-  |> group()
-  |> sort(columns: ["_time"])
-"""
 
 influx_client: InfluxDBClient = InfluxDBClient.from_env_properties()
 query_client = influx_client.query_api()
@@ -296,7 +287,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def is_alive(self, ctx: Interaction, node_id: str):
         gateway = self.gateway_manager.get_gateway(node_id)
-        tables = query_client.query(QUERY_RECENT_PACKETS.format(gateway.node_hex_id_with_bang))
+        tables = influx_reader.get_recent_packets(gateway.node_hex_id_with_bang)
 
         if not tables:
             await ctx.response.send_message(

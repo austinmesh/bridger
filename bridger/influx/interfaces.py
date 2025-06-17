@@ -94,6 +94,22 @@ class InfluxReader:
             logger.error(f"Error getting node IDs: {e}")
             return []
 
+    def get_recent_packets(self, gateway_id: str, range: str = "-1h"):
+        """Get recent packets for a gateway within the specified time range."""
+        query = dedent(
+            f"""
+            from(bucket: "{INFLUXDB_V2_BUCKET}")
+              |> range(start: {range})
+              |> filter(fn: (r) => r["gateway_id"] == "{gateway_id}")
+              |> filter(fn: (r) => r["_field"] == "packet_id")
+              |> keep(columns: ["_from", "_time", "_measurement"])
+              |> group()
+              |> sort(columns: ["_time"])
+        """
+        )
+
+        return self.query_data(query)
+
     @staticmethod
     def _extract_first_record(table_list):
         if not table_list:
