@@ -117,3 +117,17 @@ class TraceroutePoint(TelemetryPoint):
     snr_towards: Optional[int] = None
     route_back: Optional[int] = None
     snr_back: Optional[int] = None
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
+class AnnotationPoint:
+    measurement_name = "annotation"
+
+    node_id: str = field(metadata={"influx_kind": "tag"})
+    annotation_type: str = field(metadata={"influx_kind": "tag"})
+    body: str = field(metadata={"influx_kind": "field"})
+    title: str = field(metadata={"influx_kind": "tag"})
+    author: str = field(metadata={"influx_kind": "tag"})
+    start_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    end_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})

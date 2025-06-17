@@ -50,6 +50,50 @@ class InfluxReader:
         record = self._extract_first_record(self.query_data(query))
         return record.values if record else None
 
+    def get_all_node_ids(self, range: str = "-30d") -> list[dict]:
+        """Get all unique node IDs with display names from the last 30 days for autocomplete."""
+        query = dedent(
+            f"""
+            import "strings"
+            import "contrib/bonitoo-io/hex"
+
+            hexify = (str) => {{
+              hexString = hex.string(v: int(v: str))
+              return if strings.strlen(v: hexString) == 7 then "0" + hexString else hexString
+            }}
+
+            from(bucket: "{INFLUXDB_V2_BUCKET}")
+              |> range(start: {range})
+              |> filter(fn: (r) => r._field == "packet_id")
+              |> filter(fn: (r) => r._measurement == "node")
+              |> group(columns: ["_from"])
+              |> unique(column: "_from")
+              |> map(fn: (r) => ({{ _value: hexify(str: r._from),
+                                   name: r.short_name + " (" + hexify(str: r._from) + ") - " + r.long_name}}))
+              |> sort(columns: ["_value"])
+        """
+        )
+
+        try:
+            tables = self.query_data(query)
+            if not tables:
+                return []
+
+            nodes = []
+            seen_values = set()
+            for table in tables:
+                for record in table.records:
+                    value = record.values.get("_value")
+                    name = record.values.get("name")
+                    if value and value not in seen_values:
+                        nodes.append({"value": value, "name": name if name else value})
+                        seen_values.add(value)
+
+            return sorted(nodes, key=lambda x: x["value"])
+        except Exception as e:
+            logger.error(f"Error getting node IDs: {e}")
+            return []
+
     @staticmethod
     def _extract_first_record(table_list):
         if not table_list:
@@ -124,3 +168,38 @@ class InfluxWriter:
             elif kind == "field":
                 field_keys.append(f.name)
         return tag_keys, field_keys
+
+    def write_annotation(self, annotation_data):
+        """Write annotation data to the annotations bucket."""
+        import time
+
+        from bridger.dataclasses import AnnotationPoint
+
+        try:
+            # Set start_time to current time if not provided
+            if annotation_data.start_time is None:
+                annotation_data.start_time = int(time.time())
+
+            tag_keys, field_keys = self.extract_keys(AnnotationPoint)
+
+            self.write_api.write(
+                bucket="annotations",
+                record=annotation_data,
+                record_measurement_name=annotation_data.measurement_name,
+                record_field_keys=field_keys,
+                record_tag_keys=tag_keys,
+                write_precision=INFLUXDB_V2_WRITE_PRECISION,
+            )
+
+            end_info = f" to {annotation_data.end_time}" if annotation_data.end_time else ""
+            logger.opt(colors=True).info(
+                f"Wrote annotation for node <green>{annotation_data.node_id}</green> of type "
+                f"<yellow>{annotation_data.annotation_type}</yellow> by <cyan>{annotation_data.author}</cyan> "
+                f"from {annotation_data.start_time}{end_info}"
+            )
+        except ApiException as e:
+            if e.status == 401:
+                logger.error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
+            else:
+                logger.error(f"Error writing annotation to InfluxDB: {e}")
+            raise
