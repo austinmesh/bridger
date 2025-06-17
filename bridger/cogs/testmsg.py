@@ -22,7 +22,6 @@ MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 12537886093169
 TEST_MESSAGE_MATCHERS = [
     re.compile(r"^.*$", flags=re.IGNORECASE) if os.getenv("TEST_MESSAGE_MATCH_ALL", "false").lower() == "true" else None,
     re.compile(r"^\!\b.+$", flags=re.IGNORECASE),
-    re.compile(r"^test\s+.+$", flags=re.IGNORECASE),
 ]
 
 
