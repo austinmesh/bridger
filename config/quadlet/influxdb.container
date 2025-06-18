@@ -1,5 +1,5 @@
 [Container]
-Image = docker.io/library/influxdb:2.7.11
+Image = docker.io/library/influxdb:2.7.12
 PublishPort = 8086:8086
 Volume = influxdb-data.volume:/var/lib/influxdb2
 Volume = influxdb-config.volume:/etc/influxdb2
