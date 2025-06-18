@@ -127,7 +127,7 @@ class AnnotationPoint:
     node_id: str = field(metadata={"influx_kind": "tag"})
     annotation_type: str = field(metadata={"influx_kind": "tag"})
     body: str = field(metadata={"influx_kind": "field"})
-    title: str = field(metadata={"influx_kind": "tag"})
     author: str = field(metadata={"influx_kind": "tag"})
+    global_annotation: bool = field(default=False, metadata={"influx_kind": "tag"})
     start_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     end_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})

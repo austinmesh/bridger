@@ -309,6 +309,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         node_id="The hex node ID to annotate. With or without the preceding ! such as !cbaf0421 or cbaf0421",
         annotation_type="The type of annotation",
         text="Description text for the annotation",
+        global_annotation="Make this annotation global (admins only)",
         start_time="Start time (optional). Formats: Unix timestamp, ISO (2024-01-01T12:00:00Z), "
         "date (2024-01-01), or relative (+1h, +30m, +2d). Defaults to now.",
         end_time="End time (optional). Same formats as start_time. Leave empty for point-in-time annotation.",
@@ -325,9 +326,10 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             "power_cycle",
             "antenna_adjustment",
             "firmware_update",
-            "hardware_issue",
+            "unresponsive_state",
         ],
         text: str,
+        global_annotation: bool = False,
         start_time: Optional[str] = None,
         end_time: Optional[str] = None,
     ):
@@ -371,7 +373,16 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         # Check if user has permission for this specific node (for non-admins)
         bridger_admin_role = get(ctx.guild.roles, name=BRIDGER_ADMIN_ROLE)
-        if bridger_admin_role not in ctx.user.roles:
+        is_admin = bridger_admin_role and bridger_admin_role in ctx.user.roles
+
+        # Validate global annotation permission
+        if global_annotation and not is_admin:
+            await ctx.response.send_message(
+                "Only Bridger Admins can create global annotations.", ephemeral=True, delete_after=self.delete_after
+            )
+            return
+
+        if not is_admin:
             # For non-admins, verify they own this specific node
             gateway_manager = GatewayManagerEMQX(emqx)
             try:
@@ -395,8 +406,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             node_id=normalized_node_id,
             annotation_type=annotation_type,
             body=text,
-            title=f"{normalized_node_id}: {annotation_type.replace('_', ' ').title()}",
             author=ctx.user.display_name,
+            global_annotation=global_annotation,
             start_time=parsed_start_time,  # Will default to now() in write_annotation if None
             end_time=parsed_end_time,
         )
@@ -407,7 +418,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             writer.write_annotation(annotation)
 
             # Build response message
-            response_msg = f"Annotation added for node **{normalized_node_id}**:\n"
+            global_text = " (GLOBAL)" if global_annotation else ""
+            response_msg = f"Annotation{global_text} added for node **{normalized_node_id}**:\n"
             response_msg += f"Type: **{annotation_type}**\n"
             response_msg += f"Text: {text}\n"
 
