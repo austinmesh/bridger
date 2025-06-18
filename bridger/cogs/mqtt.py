@@ -265,8 +265,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.command(name="list-accounts", description="List MQTT accounts (all if admin, your own if owner)")
     async def list_accounts(self, ctx: Interaction):
         # Check if user is a Bridger Admin
-        bridger_admin_role = get(ctx.guild.roles, name=BRIDGER_ADMIN_ROLE)
-        is_admin = bridger_admin_role and bridger_admin_role in ctx.user.roles
+        is_admin = is_bridger_admin(ctx.user)
 
         # Get all gateways
         all_gateways = self.gateway_manager.list_gateways()
