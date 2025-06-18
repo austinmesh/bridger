@@ -105,12 +105,31 @@ def check_gateway_owner(interaction: Interaction) -> bool:
         return False
 
 
+def is_bridger_admin(interaction: Interaction) -> bool:
+    """Check if user has the Bridger admin role."""
+    bridger_admin_role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
+    has_admin_role = bridger_admin_role and bridger_admin_role in interaction.user.roles
+    logger.debug(f"User {interaction.user} has admin role: {has_admin_role}")
+    return has_admin_role
+
+
+def check_any_gateway_ownership(interaction: Interaction) -> bool:
+    """Check if user owns any gateway."""
+    try:
+        gateway_manager = GatewayManagerEMQX(emqx)
+        all_gateways = gateway_manager.list_gateways()
+        user_owns_gateway = any(gateway.owner_id == interaction.user.id for gateway in all_gateways)
+        logger.debug(f"User {interaction.user} owns any gateway: {user_owns_gateway}")
+        return user_owns_gateway
+    except Exception as e:
+        logger.warning(f"Error checking if user owns any gateway: {e}")
+        return False
+
+
 def is_bridger_admin_or_owner(interaction: Interaction) -> bool:
     """Check if user is either a Bridger admin or owns the gateway in question."""
     # Check admin role first (more efficient)
-    bridger_admin_role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
-    if bridger_admin_role and bridger_admin_role in interaction.user.roles:
-        logger.debug(f"User {interaction.user} has admin role")
+    if is_bridger_admin(interaction):
         return True
 
     # If not admin, check if they own the specific gateway
@@ -121,6 +140,16 @@ def is_bridger_admin_or_owner(interaction: Interaction) -> bool:
     except Exception as e:
         logger.warning(f"Error checking gateway ownership: {e}")
         return False
+
+
+def is_bridger_admin_or_gateway_owner(interaction: Interaction) -> bool:
+    """Check if user is either a Bridger admin or owns any gateway."""
+    # Check admin role first (more efficient)
+    if is_bridger_admin(interaction):
+        return True
+
+    # If not admin, check if they own any gateway
+    return check_any_gateway_ownership(interaction)
 
 
 class GatewayPaginationView(ui.View):
@@ -232,18 +261,35 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         else:
             await ctx.response.send_message(f"Gateway not found: {node_id}", ephemeral=True, delete_after=self.delete_after)
 
-    @app_commands.checks.has_role(BRIDGER_ADMIN_ROLE)
-    @app_commands.command(name="list-accounts", description="List all MQTT accounts")
+    @app_commands.check(is_bridger_admin_or_gateway_owner)
+    @app_commands.command(name="list-accounts", description="List MQTT accounts (all if admin, your own if owner)")
     async def list_accounts(self, ctx: Interaction):
-        gateways = self.gateway_manager.list_gateways()
+        # Check if user is a Bridger Admin
+        bridger_admin_role = get(ctx.guild.roles, name=BRIDGER_ADMIN_ROLE)
+        is_admin = bridger_admin_role and bridger_admin_role in ctx.user.roles
+
+        # Get all gateways
+        all_gateways = self.gateway_manager.list_gateways()
+
+        if is_admin:
+            # Admin sees all gateways
+            gateways = all_gateways
+            list_type = "gateways"
+        else:
+            # Regular user sees only their own gateways
+            gateways = [gateway for gateway in all_gateways if gateway.owner_id == ctx.user.id]
+            list_type = "of your own gateways"
 
         if not gateways:
-            await ctx.response.send_message(content="There are no provisioned gateways in the system.", ephemeral=True)
+            if is_admin:
+                await ctx.response.send_message(content="There are no provisioned gateways in the system.", ephemeral=True)
+            else:
+                await ctx.response.send_message(content="You don't own any provisioned gateways.", ephemeral=True)
             return
 
         if len(gateways) <= 25:
             # Simple embed for 25 or fewer gateways
-            embed = Embed(description="Currently provisioned gateways:", color=0x6CEB94)
+            embed = Embed(description=f"Currently provisioned gateways ({list_type}):", color=0x6CEB94)
 
             for gateway in gateways:
                 owner = self.bot.get_user(gateway.owner_id)
@@ -256,7 +302,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                 )
 
             await ctx.response.send_message(
-                content=f"There are {len(gateways)} provisioned gateways in the system.",
+                content=f"There are {len(gateways)} {list_type} in the system.",
                 embed=embed,
                 ephemeral=True,
             )
@@ -266,7 +312,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             embed = view.get_page_embed()
 
             await ctx.response.send_message(
-                content=f"There are {len(gateways)} provisioned gateways in the system.",
+                content=f"There are {len(gateways)} {list_type} in the system.",
                 embed=embed,
                 view=view,
                 ephemeral=True,
