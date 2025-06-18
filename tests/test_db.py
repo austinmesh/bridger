@@ -1,6 +1,13 @@
 import pytest
 
-from bridger.dataclasses import DeviceTelemetryPoint, NodeInfoPoint, PositionPoint, SensorTelemetryPoint, TelemetryPoint
+from bridger.dataclasses import (
+    AnnotationPoint,
+    DeviceTelemetryPoint,
+    NodeInfoPoint,
+    PositionPoint,
+    SensorTelemetryPoint,
+    TelemetryPoint,
+)
 
 
 @pytest.fixture
@@ -48,6 +55,42 @@ class TestHappyPathPoints:
         assert device_telemetry.voltage == 1.0
         assert device_telemetry.battery_level == 1
 
+    def test_annotation_point_basic(self):
+        annotation = AnnotationPoint(
+            node_id="cbaf0421", annotation_type="general_maintenance", body="Test annotation description", author="TestUser"
+        )
+        assert annotation.node_id == "cbaf0421"
+        assert annotation.annotation_type == "general_maintenance"
+        assert annotation.body == "Test annotation description"
+        assert annotation.author == "TestUser"
+        assert annotation.global_annotation is False  # Default value
+        assert annotation.start_time is None  # Default value
+        assert annotation.end_time is None  # Default value
+
+    def test_annotation_point_with_all_fields(self):
+        annotation = AnnotationPoint(
+            node_id="12345678",
+            annotation_type="power_cycle",
+            body="Rebooting due to connectivity issues",
+            author="AdminUser",
+            global_annotation=True,
+            start_time=1640995200,
+            end_time=1640995260,
+        )
+        assert annotation.node_id == "12345678"
+        assert annotation.annotation_type == "power_cycle"
+        assert annotation.body == "Rebooting due to connectivity issues"
+        assert annotation.author == "AdminUser"
+        assert annotation.global_annotation is True
+        assert annotation.start_time == 1640995200
+        assert annotation.end_time == 1640995260
+
+    def test_annotation_point_global_default_false(self):
+        annotation = AnnotationPoint(
+            node_id="abcdef12", annotation_type="firmware_update", body="Updated to version 2.3.4", author="DevUser"
+        )
+        assert annotation.global_annotation is False
+
 
 class TestExtraArgumentsPasses:
     def test_telemetry_point(self, common_parameters_good):
@@ -77,3 +120,11 @@ class TestExtraArgumentsPasses:
 
         with pytest.raises(AttributeError):
             device_telemetry.extra
+
+    def test_annotation_point(self):
+        annotation = AnnotationPoint(
+            node_id="cbaf0421", annotation_type="general_maintenance", body="Test annotation", author="TestUser", extra=1
+        )
+
+        with pytest.raises(AttributeError):
+            annotation.extra
