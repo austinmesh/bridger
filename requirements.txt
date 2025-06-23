@@ -87,7 +87,7 @@ protobuf==6.31.1
     #   meshtastic
 pycparser==2.22
     # via cffi
-pygments==2.19.1
+pygments==2.19.2
     # via pytest
 pypubsub==4.0.3
     # via meshtastic
