@@ -93,7 +93,7 @@ pypubsub==4.0.3
     # via meshtastic
 pyserial==3.5
     # via meshtastic
-pytest==8.4.0
+pytest==8.4.1
     # via
     #   bridger (pyproject.toml)
     #   pytest-aiohttp
