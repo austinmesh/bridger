@@ -1,5 +1,4 @@
 import base64
-from collections import deque
 
 from google.protobuf.message import DecodeError
 from influxdb_client import InfluxDBClient
@@ -8,6 +7,7 @@ from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 
 from bridger.config import MQTT_TOPIC
+from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
@@ -17,7 +17,7 @@ class BridgerMQTT(Client):
     def __init__(self, influx_client: InfluxDBClient, *args, **kwargs):
         self.influx_client = influx_client  # Before super().__init__ call so it isn't passed to the parent class
         super().__init__(*args, **kwargs)
-        self.message_queue = deque(maxlen=100)  # Bounded deque for message queue
+        self.deduplicator = PacketDeduplicator(maxlen=100)
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code != 0:
@@ -52,17 +52,11 @@ class BridgerMQTT(Client):
 
         try:
             service_envelope = ServiceEnvelope.FromString(message.payload)
-            packet_id = service_envelope.packet.id
-            gateway_id = service_envelope.gateway_id
 
-            if packet_id in self.message_queue:
-                logger.bind(envelope_id=packet_id).opt(colors=True).debug(
-                    f"Packet <yellow>{packet_id}</yellow> from <green>{gateway_id}</green> already in queue"
-                )
+            if not self.deduplicator.should_process(service_envelope):
                 return
 
-            self.message_queue.append(packet_id)  # Append packet_id to bounded deque
-
+            packet_id = service_envelope.packet.id
             pb_processor = PBPacketProcessor(service_envelope)
             influx_writer = InfluxWriter(self.influx_client)
             set_user({"id": getattr(service_envelope.packet, "from")})

@@ -13,6 +13,7 @@ from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
 
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
 from bridger.dataclasses import TextMessagePoint
+from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
@@ -33,6 +34,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel_id = discord_channel_id
         self.discord_channel = None
         self.influx_reader = influx_reader
+        self.deduplicator = PacketDeduplicator(maxlen=100)
 
     @commands.Cog.listener(name="on_ready")
     async def on_ready(self):
@@ -104,6 +106,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     service_envelope = ServiceEnvelope.FromString(message.payload)
                 except Exception:
                     logger.exception("Failed to decode MQTT message")
+                    continue
+
+                if not self.deduplicator.should_process(service_envelope):
                     continue
 
                 processor = PBPacketProcessor(service_envelope=service_envelope, strip_text=False)
