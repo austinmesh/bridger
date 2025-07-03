@@ -30,9 +30,9 @@ cffi==1.17.1
     # via cryptography
 charset-normalizer==3.4.2
     # via requests
-coverage==7.9.1
+coverage==7.9.2
     # via pytest-cov
-cryptography==45.0.4
+cryptography==45.0.5
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
@@ -56,9 +56,9 @@ loguru==0.7.3
     # via bridger (pyproject.toml)
 marshmallow==3.26.1
     # via dataclasses-json
-meshtastic==2.6.3
+meshtastic==2.6.4
     # via bridger (pyproject.toml)
-multidict==6.4.4
+multidict==6.6.3
     # via
     #   aiohttp
     #   yarl
@@ -87,13 +87,13 @@ protobuf==6.31.1
     #   meshtastic
 pycparser==2.22
     # via cffi
-pygments==2.19.1
+pygments==2.19.2
     # via pytest
 pypubsub==4.0.3
     # via meshtastic
 pyserial==3.5
     # via meshtastic
-pytest==8.4.0
+pytest==8.4.1
     # via
     #   bridger (pyproject.toml)
     #   pytest-aiohttp
@@ -107,7 +107,7 @@ pytest-cov==6.2.1
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via influxdb-client
-python-dotenv==1.1.0
+python-dotenv==1.1.1
     # via bridger (pyproject.toml)
 pyyaml==6.0.2
     # via meshtastic
@@ -120,7 +120,7 @@ requests==2.32.4
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-sentry-sdk==2.30.0
+sentry-sdk==2.32.0
     # via bridger (pyproject.toml)
 six==1.17.0
     # via python-dateutil
@@ -132,7 +132,7 @@ typing-extensions==4.14.0
     #   typing-inspect
 typing-inspect==0.9.0
     # via dataclasses-json
-urllib3==2.4.0
+urllib3==2.5.0
     # via
     #   influxdb-client
     #   requests
