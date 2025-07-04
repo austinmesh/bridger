@@ -1,4 +1,3 @@
-from collections import deque
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,21 +43,18 @@ class TestBridgerMQTT:
         mqtt_client.on_disconnect(mqtt_client, None, None, 0, None)
 
     def test_on_message(self, mqtt_client, mqtt_message):
-        mqtt_client.message_queue = deque(maxlen=100)
         mqtt_client._handle_decode_error = MagicMock()
         with patch.object(ServiceEnvelope, "FromString", return_value=MagicMock(packet=MagicMock(id=1, _from="test_user"))):
             mqtt_client.on_message(mqtt_client, None, mqtt_message)
-            assert len(mqtt_client.message_queue) == 1
+            assert len(mqtt_client.deduplicator.message_queue) == 1
 
     def test_on_message_decode_error(self, mqtt_client, mqtt_message):
-        mqtt_client.message_queue = deque(maxlen=100)
         mqtt_client._handle_decode_error = MagicMock()
         with patch.object(ServiceEnvelope, "FromString", side_effect=DecodeError):
             mqtt_client.on_message(mqtt_client, None, mqtt_message)
             mqtt_client._handle_decode_error.assert_called_once()
 
     def test_on_message_type_error(self, mqtt_client, mqtt_message):
-        mqtt_client.message_queue = deque(maxlen=100)
         with patch.object(ServiceEnvelope, "FromString", return_value=MagicMock(packet=MagicMock(id=1))):
             with patch.object(PBPacketProcessor, "__init__", side_effect=TypeError):
                 mqtt_client.on_message(mqtt_client, None, mqtt_message)
@@ -68,10 +64,11 @@ class TestBridgerMQTT:
         mqtt_client._handle_decode_error(DecodeError(), {}, payload)
 
     def test_second_packet_skipped(self, mqtt_client, mqtt_message):
-        mqtt_client.message_queue = deque(maxlen=100)
         mqtt_client._handle_decode_error = MagicMock()
         with patch.object(ServiceEnvelope, "FromString", return_value=MagicMock(packet=MagicMock(id=1, _from="test_user"))):
             mqtt_client.on_message(mqtt_client, None, mqtt_message)
-            assert len(mqtt_client.message_queue) == 1
+            assert len(mqtt_client.deduplicator.message_queue) == 1
             mqtt_client.on_message(mqtt_client, None, mqtt_message)
-            assert len(mqtt_client.message_queue) == 1  # The second packet should be skipped, queue length should remain 1
+            assert (
+                len(mqtt_client.deduplicator.message_queue) == 1
+            )  # The second packet should be skipped, queue length should remain 1
