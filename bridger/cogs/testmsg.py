@@ -48,7 +48,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         snr = packet.rx_snr
         rssi = packet.rx_rssi
         hop_count = None
-        formatted_time = datetime.fromtimestamp(packet.rx_time).strftime("%H:%M:%S")
+        formatted_time = datetime.now().strftime("%H:%M:%S")
 
         if packet.hop_start > 0:
             hop_count = packet.hop_start - packet.hop_limit
