@@ -64,9 +64,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         short_name = node_info.get("short_name") if node_info else None
         long_name = node_info.get("long_name") if node_info else None
         if short_name and long_name:
-            embed.description = f"Heard by **{short_name}** ({long_name}) [**{gateway}**] at {formatted_time}"
+            embed.description = f"Heard by **{short_name}** - {long_name} - `{gateway}` at {formatted_time}"
         else:
-            embed.description = f"Heard by **{gateway}** at {formatted_time}"
+            embed.description = f"Heard by `{gateway}` at {formatted_time}"
         embed.add_field(name="SNR", value=snr, inline=True)
         embed.add_field(name="RSSI", value=rssi, inline=True)
 
