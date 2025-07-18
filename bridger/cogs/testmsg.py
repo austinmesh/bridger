@@ -41,6 +41,20 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel = self.bot.get_channel(self.discord_channel_id)
         logger.info(f"TestMsg cog is ready and channel is: {self.discord_channel}")
 
+    @staticmethod
+    def format_node_name(node_id: int, node_info: dict = None) -> str:
+        """Format a consistent node name based on available info"""
+        if not node_info:
+            return f"**{node_id}**"
+
+        short = node_info.get("short_name")
+        long = node_info.get("long_name")
+
+        if short and long:
+            return f"**{short}** - {long}"
+        else:
+            return f"**{node_id}**"
+
     def create_embed(self, service_envelope: ServiceEnvelope):
         packet = service_envelope.packet
         gateway = service_envelope.gateway_id
@@ -48,7 +62,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         snr = packet.rx_snr
         rssi = packet.rx_rssi
         hop_count = None
-        formatted_time = datetime.now().strftime("%H:%M:%S")
+        formatted_time = datetime.fromtimestamp(packet.rx_time).strftime("%H:%M:%S")
 
         if packet.hop_start > 0:
             hop_count = packet.hop_start - packet.hop_limit
@@ -61,12 +75,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         except (ValueError, TypeError) as e:
             logger.error(f"Failed to parse gateway ID '{gateway}': {e}")
             node_info = None
-        short_name = node_info.get("short_name") if node_info else None
-        long_name = node_info.get("long_name") if node_info else None
-        if short_name and long_name:
-            embed.description = f"Heard by **{short_name}** - {long_name} - `{gateway}` at {formatted_time}"
-        else:
-            embed.description = f"Heard by `{gateway}` at {formatted_time}"
+
+        gateway_name = self.format_node_name(gateway_id if "gateway_id" in locals() else gateway, node_info)
+        embed.description = f"Heard by {gateway_name} - `{gateway}` at {formatted_time}"
         embed.add_field(name="SNR", value=snr, inline=True)
         embed.add_field(name="RSSI", value=rssi, inline=True)
 
@@ -128,9 +139,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     source_node_id = getattr(packet, "from")
                     node_info = self.influx_reader.get_node_info(source_node_id)
 
-                    short = node_info.get("short_name") if node_info else None
-                    long = node_info.get("long_name") if node_info else None
-                    name = f"**{short}** ({long})" if short and long else f"**{source_node_id}**"
+                    name = self.format_node_name(source_node_id, node_info)
                     message_id = await self.queue.get(packet_id)
 
                     extra = {
@@ -138,8 +147,8 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                         "source_node_id": source_node_id,
                         "text": data.text,
                         "gateway": service_envelope.gateway_id,
-                        "short_name": short,
-                        "long_name": long,
+                        "short_name": node_info.get("short_name") if node_info else None,
+                        "long_name": node_info.get("long_name") if node_info else None,
                         "name": name,
                         "node_info": node_info,
                     }
@@ -153,7 +162,8 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                         except Exception:
                             logger.exception("Failed to fetch or edit Discord message")
                     else:
-                        content = f"Test message from {name} <t:{packet.rx_time}:R>\n> {data.text}"
+                        now_timestamp = int(datetime.now().timestamp())
+                        content = f"Test message from {name} - {source_node_id} <t:{now_timestamp}:R>\n> {data.text}"
                         embeds = [self.create_embed(service_envelope)]
                         try:
                             message: Message = await self.discord_channel.send(content, embeds=embeds)
