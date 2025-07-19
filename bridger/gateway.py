@@ -8,6 +8,7 @@ from typing import Generator, Union
 from discord import Member, User
 from requests import HTTPError
 
+from bridger.dataclasses import NodeMixin
 from bridger.emqx import EMQXClient
 from bridger.log import logger
 from bridger.mqtt import MQTT_TOPIC
@@ -21,7 +22,7 @@ emqx = EMQXClient(EMQX_URL, EMQX_API_KEY, EMQX_SECRET_KEY)
 
 
 @dataclass
-class GatewayData:
+class GatewayData(NodeMixin):
     node_hex_id: str
     owner_id: int
 
@@ -32,16 +33,6 @@ class GatewayData:
     @property
     def color(self) -> str:
         return self.node_hex_id_without_bang[-6:]
-
-    @property
-    def node_hex_id_with_bang(self) -> str:
-        if self.node_hex_id.startswith("!"):
-            return self.node_hex_id
-        return f"!{self.node_hex_id}"
-
-    @property
-    def node_hex_id_without_bang(self) -> str:
-        return self.node_hex_id.lstrip("!")
 
     @property
     def user_string(self) -> str:
