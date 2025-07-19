@@ -5,29 +5,22 @@ from typing import Optional
 from dataclasses_json import Undefined, config, dataclass_json
 
 
-@dataclass
 class NodeMixin:
+    def _get_node_id(self) -> int:
+        if hasattr(self, "_from"):
+            return self._from
+        elif hasattr(self, "node_id"):
+            return self.node_id
+        else:
+            raise AttributeError("Object must have either '_from' or 'node_id' attribute")
+
     @property
     def node_hex_id_with_bang(self) -> str:
-        if hasattr(self, "_from"):
-            return f"!{self._from:08x}"
-        elif hasattr(self, "node_id"):
-            return f"!{self.node_id:08x}"
-        elif hasattr(self, "node_hex_id"):
-            # Handle GatewayData case where we already have hex_id
-            if self.node_hex_id.startswith("!"):
-                return self.node_hex_id
-            return f"!{self.node_hex_id}"
-        else:
-            raise AttributeError("Object must have either '_from', 'node_id', or 'node_hex_id' attribute")
+        return f"!{self._get_node_id():08x}"
 
     @property
     def node_hex_id_without_bang(self) -> str:
-        if hasattr(self, "node_hex_id"):
-            # Handle GatewayData case where we already have hex_id
-            return self.node_hex_id.lstrip("!")
-        else:
-            return self.node_hex_id_with_bang[1:]
+        return f"{self._get_node_id():08x}"
 
     @property
     def color(self) -> str:
