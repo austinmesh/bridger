@@ -29,6 +29,10 @@ class NodeMixin:
         else:
             return self.node_hex_id_with_bang[1:]
 
+    @property
+    def color(self) -> str:
+        return self.node_hex_id_without_bang[-6:]
+
 
 @dataclass
 class NodeData(NodeMixin):

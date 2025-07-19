@@ -31,10 +31,6 @@ class GatewayData(NodeMixin):
         return int(self.node_hex_id_without_bang, 16)
 
     @property
-    def color(self) -> str:
-        return self.node_hex_id_without_bang[-6:]
-
-    @property
     def user_string(self) -> str:
         return f"{self.owner_id}-{self.node_hex_id_without_bang}"
 

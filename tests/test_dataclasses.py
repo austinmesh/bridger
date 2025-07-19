@@ -34,24 +34,28 @@ class TestNodeMixin:
         node = TestNodeWithNodeId(node_id=439041101)  # 0x1a2b3c4d
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
+        assert node.color == "2b3c4d"
 
     def test_node_hex_id_with_bang_from_from_attribute(self):
         """Test hex ID conversion from _from attribute"""
         node = TestNodeWithFrom(_from=439041101)  # 0x1a2b3c4d
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
+        assert node.color == "2b3c4d"
 
     def test_node_hex_id_with_bang_from_hex_id_without_bang(self):
         """Test hex ID conversion from node_hex_id without ! prefix"""
         node = TestNodeWithHexId(node_hex_id="1a2b3c4d")
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
+        assert node.color == "2b3c4d"
 
     def test_node_hex_id_with_bang_from_hex_id_with_bang(self):
         """Test hex ID conversion from node_hex_id with ! prefix"""
         node = TestNodeWithHexId(node_hex_id="!1a2b3c4d")
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
+        assert node.color == "2b3c4d"
 
     def test_node_hex_id_padding(self):
         """Test that hex IDs are properly zero-padded to 8 characters"""
@@ -101,6 +105,20 @@ class TestNodeMixin:
         node = TestNodeBoth(node_id=439041101, node_hex_id="abcdef12")  # Should use node_id
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
 
+    def test_color_property_various_scenarios(self):
+        """Test color property extraction in various scenarios"""
+        # Test with short hex (should take last 6 chars after padding)
+        node1 = TestNodeWithNodeId(node_id=255)  # 0x000000ff
+        assert node1.color == "0000ff"
+
+        # Test with full hex
+        node2 = TestNodeWithNodeId(node_id=0xFFA2B3C4)
+        assert node2.color == "a2b3c4"
+
+        # Test with hex_id input
+        node3 = TestNodeWithHexId(node_hex_id="12345678")
+        assert node3.color == "345678"
+
 
 class TestNodeData:
     """Test the NodeData class functionality"""
@@ -111,6 +129,7 @@ class TestNodeData:
         assert node.node_id == 439041101
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
+        assert node.color == "2b3c4d"
 
     def test_node_data_zero_padding(self):
         """Test NodeData with small numbers requiring zero padding"""
