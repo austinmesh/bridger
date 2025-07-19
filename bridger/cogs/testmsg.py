@@ -165,7 +165,8 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                             logger.exception("Failed to fetch or edit Discord message")
                     else:
                         now_timestamp = int(datetime.now().timestamp())
-                        content = f"Test message from {name} - {source_node.node_hex_id_with_bang} <t:{now_timestamp}:R>\n> {data.text}"
+                        content = f"Test message from {name} - `{source_node.node_hex_id_with_bang}` <t:{now_timestamp}:R>\n> {data.text}"  # noqa: E501
+
                         embeds = [self.create_embed(service_envelope)]
                         try:
                             message: Message = await self.discord_channel.send(content, embeds=embeds)
