@@ -5,6 +5,36 @@ from typing import Optional
 from dataclasses_json import Undefined, config, dataclass_json
 
 
+@dataclass
+class NodeMixin:
+    @property
+    def node_hex_id_with_bang(self) -> str:
+        if hasattr(self, "_from"):
+            return f"!{self._from:08x}"
+        elif hasattr(self, "node_id"):
+            return f"!{self.node_id:08x}"
+        elif hasattr(self, "node_hex_id"):
+            # Handle GatewayData case where we already have hex_id
+            if self.node_hex_id.startswith("!"):
+                return self.node_hex_id
+            return f"!{self.node_hex_id}"
+        else:
+            raise AttributeError("Object must have either '_from', 'node_id', or 'node_hex_id' attribute")
+
+    @property
+    def node_hex_id_without_bang(self) -> str:
+        if hasattr(self, "node_hex_id"):
+            # Handle GatewayData case where we already have hex_id
+            return self.node_hex_id.lstrip("!")
+        else:
+            return self.node_hex_id_with_bang[1:]
+
+
+@dataclass
+class NodeData(NodeMixin):
+    node_id: int
+
+
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class TelemetryPoint(ABC):

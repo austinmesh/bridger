@@ -12,7 +12,7 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
 
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
-from bridger.dataclasses import TextMessagePoint
+from bridger.dataclasses import NodeData, TextMessagePoint
 from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
@@ -137,6 +137,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     packet = service_envelope.packet
                     packet_id = packet.id
                     source_node_id = getattr(packet, "from")
+                    source_node = NodeData(node_id=source_node_id)
                     node_info = self.influx_reader.get_node_info(source_node_id)
 
                     name = self.format_node_name(source_node_id, node_info)
@@ -145,6 +146,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     extra = {
                         "packet_id": packet_id,
                         "source_node_id": source_node_id,
+                        "source_node_hex_id": source_node.node_hex_id_with_bang,
                         "text": data.text,
                         "gateway": service_envelope.gateway_id,
                         "short_name": node_info.get("short_name") if node_info else None,
@@ -163,7 +165,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                             logger.exception("Failed to fetch or edit Discord message")
                     else:
                         now_timestamp = int(datetime.now().timestamp())
-                        content = f"Test message from {name} - {source_node_id} <t:{now_timestamp}:R>\n> {data.text}"
+                        content = f"Test message from {name} - {source_node.node_hex_id_with_bang} <t:{now_timestamp}:R>\n> {data.text}"
                         embeds = [self.create_embed(service_envelope)]
                         try:
                             message: Message = await self.discord_channel.send(content, embeds=embeds)

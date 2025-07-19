@@ -128,3 +128,47 @@ def test_reset_gateway_password(gateway_manager, emqx_mock):
     assert gateway.owner_id == mock_discord_user.id
     assert len(password) == 10
     emqx_mock.update_user_password.assert_called_once_with(gateway_manager.authentication_id, gateway.user_string, password)
+
+
+class TestGatewayDataNodeMixin:
+    """Test GatewayData's inherited NodeMixin functionality"""
+
+    def test_gateway_data_hex_id_with_bang_without_prefix(self):
+        """Test GatewayData hex ID conversion without ! prefix"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
+        assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
+        assert gateway.node_hex_id_without_bang == "1a2b3c4d"
+
+    def test_gateway_data_hex_id_with_bang_with_prefix(self):
+        """Test GatewayData hex ID conversion with ! prefix"""
+        gateway = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+        assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
+        assert gateway.node_hex_id_without_bang == "1a2b3c4d"
+
+    def test_gateway_data_node_id_property(self):
+        """Test GatewayData node_id property calculation"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
+        assert gateway.node_id == int("1a2b3c4d", 16)
+        assert gateway.node_id == 439041101
+
+    def test_gateway_data_color_property(self):
+        """Test GatewayData color property extraction"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
+        assert gateway.color == "2b3c4d"  # Last 6 characters
+
+    def test_gateway_data_user_string_property(self):
+        """Test GatewayData user_string property"""
+        gateway = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+        assert gateway.user_string == "12345-1a2b3c4d"
+
+    def test_gateway_data_hex_id_consistency(self):
+        """Test that hex ID methods are consistent regardless of input format"""
+        gateway1 = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
+        gateway2 = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+
+        # Both should produce the same results
+        assert gateway1.node_hex_id_with_bang == gateway2.node_hex_id_with_bang
+        assert gateway1.node_hex_id_without_bang == gateway2.node_hex_id_without_bang
+        assert gateway1.node_id == gateway2.node_id
+        assert gateway1.color == gateway2.color
+        assert gateway1.user_string == gateway2.user_string
