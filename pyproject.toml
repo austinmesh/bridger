@@ -34,6 +34,7 @@ dependencies = [
     "pytest-aiohttp",
     "requests",
     "requests-mock",
+    "schedule",
     "sentry-sdk",
 ]
 

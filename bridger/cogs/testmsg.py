@@ -1,5 +1,4 @@
 import os
-import re
 from datetime import datetime
 from functools import partial
 
@@ -17,13 +16,11 @@ from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
+from bridger.shared.message_processing import MessageMatchers, NodeFormatter, TopicManager
+from bridger.virtual_node.config import VIRTUAL_NODE_ID
 
 MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "LongFast")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
-TEST_MESSAGE_MATCHERS = [
-    re.compile(r"^.*$", flags=re.IGNORECASE) if os.getenv("TEST_MESSAGE_MATCH_ALL", "false").lower() == "true" else None,
-    re.compile(r"^\!\b.+$", flags=re.IGNORECASE),
-]
 
 
 class TestMsg(commands.GroupCog, name="testmsg"):
@@ -35,6 +32,12 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel = None
         self.influx_reader = influx_reader
         self.deduplicator = PacketDeduplicator(maxlen=100)
+        self.message_matchers = MessageMatchers.get_test_message_matchers()
+        self.topics = TopicManager.get_multiple_topics(
+            MQTT_TOPIC,
+            MQTT_TEST_CHANNEL_MESHTASTIC,
+            [f"{VIRTUAL_NODE_ID:08x}"],  # Also listen to virtual node direct messages
+        )
 
     @commands.Cog.listener(name="on_ready")
     async def on_ready(self):
@@ -44,16 +47,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
     @staticmethod
     def format_node_name(node_id: int, node_info: dict = None) -> str:
         """Format a consistent node name based on available info"""
-        if not node_info:
-            return f"**{node_id}**"
-
-        short = node_info.get("short_name")
-        long = node_info.get("long_name")
-
-        if short and long:
-            return f"**{short}** - {long}"
-        else:
-            return f"**{node_id}**"
+        return NodeFormatter.format_node_name(node_id, node_info)
 
     def create_embed(self, service_envelope: ServiceEnvelope):
         packet = service_envelope.packet
@@ -97,10 +91,6 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         await message.edit(embeds=message.embeds)
 
     async def run_mqtt(self):
-        topic = MQTT_TOPIC.removesuffix("/#")
-        channel = MQTT_TEST_CHANNEL_MESHTASTIC
-        full_topic = f"{topic}/{channel}/#"
-
         async with aiomqtt.Client(
             MQTT_BROKER,
             MQTT_PORT,
@@ -108,8 +98,10 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             password=MQTT_PASS,
             clean_session=True,
         ) as client:
-            await client.subscribe(full_topic)
-            logger.info(f"Subscribed to {full_topic}")
+            # Subscribe to multiple topics
+            for topic in self.topics:
+                await client.subscribe(topic)
+                logger.info(f"Subscribed to {topic}")
             await logger.complete()
 
             async for message in client.messages:
@@ -129,7 +121,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     if not data or not data.text:
                         continue
 
-                    if not any(pattern.match(data.text) for pattern in TEST_MESSAGE_MATCHERS if pattern):
+                    if not MessageMatchers.matches_test_patterns(data.text, self.message_matchers):
                         continue
 
                     logger.debug(f"Test message matched: {data.text}")
