@@ -23,12 +23,8 @@ emqx = EMQXClient(EMQX_URL, EMQX_API_KEY, EMQX_SECRET_KEY)
 
 @dataclass
 class GatewayData(NodeMixin):
-    node_hex_id: str
+    node_id: int
     owner_id: int
-
-    @property
-    def node_id(self) -> int:
-        return int(self.node_hex_id_without_bang, 16)
 
     @property
     def user_string(self) -> str:
@@ -85,7 +81,8 @@ class GatewayManagerEMQX:
         for user in emqx_users:
             node_hex_id = user["user_id"].split("-")[1]
             owner_id = int(user["user_id"].split("-")[0])
-            gateways.append(GatewayData(node_hex_id=node_hex_id, owner_id=owner_id))
+            node_id = int(node_hex_id, 16)
+            gateways.append(GatewayData(node_id=node_id, owner_id=owner_id))
 
         return gateways
 
@@ -95,7 +92,7 @@ class GatewayManagerEMQX:
 
         topic_prefix = MQTT_TOPIC.removesuffix("/#")
         mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/LongFast/{gateway_id}", "permission": "allow"}]
-        gateway = GatewayData(node_hex_id=gateway_id, owner_id=discord_user.id)
+        gateway = GatewayData(node_id=node_id, owner_id=discord_user.id)
         rules = {"rules": mqtt_rules, "username": gateway.user_string}
 
         try:
@@ -123,14 +120,14 @@ class GatewayManagerEMQX:
         # Filter for gateways from list_gateways that match the gateway_id
         gateways = self.list_gateways()
         for gateway in gateways:
-            if gateway.node_hex_id_without_bang == gateway_id_without_bang:
+            if gateway.node_id == node_id:
                 return gateway
 
         raise ValueError("Gateway not found")
 
     def reset_gateway_password(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
         gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
-        gateway = GatewayData(node_hex_id=gateway_id, owner_id=discord_user.id)
+        gateway = GatewayData(node_id=node_id, owner_id=discord_user.id)
 
         try:
             password = self.generate_password()

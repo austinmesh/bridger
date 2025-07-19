@@ -51,7 +51,7 @@ def test_list_gateways(gateway_manager):
     assert len(gateways) == 1
     assert isinstance(gateways[0], GatewayData)
     assert gateways[0].owner_id == 1234567890
-    assert gateways[0].node_hex_id == "1a2b3c4d"
+    assert gateways[0].node_id == int("1a2b3c4d", 16)
 
 
 # Test create_gateway_user
@@ -65,7 +65,7 @@ def test_create_gateway_user(gateway_manager, emqx_mock):
 
     # Assertions
     assert isinstance(gateway, GatewayData)
-    assert gateway.node_hex_id == "!1a2b3c4d"
+    assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
     assert gateway.owner_id == mock_discord_user.id
     assert len(password) == 10
 
@@ -116,7 +116,7 @@ def test_delete_gateway_user_fail(gateway_manager, emqx_mock):
 def test_get_gateway(gateway_manager):
     gateway = gateway_manager.get_gateway("1a2b3c4d")
     assert isinstance(gateway, GatewayData)
-    assert gateway.node_hex_id == "1a2b3c4d"
+    assert gateway.node_hex_id_without_bang == "1a2b3c4d"
 
 
 # Test reset_gateway_password
@@ -133,42 +133,38 @@ def test_reset_gateway_password(gateway_manager, emqx_mock):
 class TestGatewayDataNodeMixin:
     """Test GatewayData's inherited NodeMixin functionality"""
 
-    def test_gateway_data_hex_id_with_bang_without_prefix(self):
-        """Test GatewayData hex ID conversion without ! prefix"""
-        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
-        assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
-        assert gateway.node_hex_id_without_bang == "1a2b3c4d"
-
-    def test_gateway_data_hex_id_with_bang_with_prefix(self):
-        """Test GatewayData hex ID conversion with ! prefix"""
-        gateway = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+    def test_gateway_data_hex_id_with_bang_basic(self):
+        """Test GatewayData hex ID conversion from node_id"""
+        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
         assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
         assert gateway.node_hex_id_without_bang == "1a2b3c4d"
 
     def test_gateway_data_node_id_property(self):
-        """Test GatewayData node_id property calculation"""
-        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
-        assert gateway.node_id == int("1a2b3c4d", 16)
+        """Test GatewayData node_id property storage"""
+        gateway = GatewayData(node_id=439041101, owner_id=12345)
         assert gateway.node_id == 439041101
+        assert gateway.node_id == int("1a2b3c4d", 16)
 
     def test_gateway_data_color_property(self):
         """Test GatewayData color property extraction"""
-        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
+        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
         assert gateway.color == "2b3c4d"  # Last 6 characters
 
     def test_gateway_data_user_string_property(self):
         """Test GatewayData user_string property"""
-        gateway = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
         assert gateway.user_string == "12345-1a2b3c4d"
 
-    def test_gateway_data_hex_id_consistency(self):
-        """Test that hex ID methods are consistent regardless of input format"""
-        gateway1 = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345)
-        gateway2 = GatewayData(node_hex_id="!1a2b3c4d", owner_id=12345)
+    def test_gateway_data_small_node_id(self):
+        """Test GatewayData with small node ID requiring zero padding"""
+        gateway = GatewayData(node_id=255, owner_id=12345)  # 0xff
+        assert gateway.node_hex_id_with_bang == "!000000ff"
+        assert gateway.node_hex_id_without_bang == "000000ff"
+        assert gateway.color == "0000ff"
 
-        # Both should produce the same results
-        assert gateway1.node_hex_id_with_bang == gateway2.node_hex_id_with_bang
-        assert gateway1.node_hex_id_without_bang == gateway2.node_hex_id_without_bang
-        assert gateway1.node_id == gateway2.node_id
-        assert gateway1.color == gateway2.color
-        assert gateway1.user_string == gateway2.user_string
+    def test_gateway_data_large_node_id(self):
+        """Test GatewayData with large node ID"""
+        gateway = GatewayData(node_id=4294967295, owner_id=12345)  # 0xffffffff
+        assert gateway.node_hex_id_with_bang == "!ffffffff"
+        assert gateway.node_hex_id_without_bang == "ffffffff"
+        assert gateway.color == "ffffff"
