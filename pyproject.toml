@@ -23,6 +23,8 @@ dependencies = [
     "cryptography",
     "dataclasses-json",
     "discord.py",
+    "grpcio",
+    "grpcio-tools",
     "influxdb-client",
     "loguru",
     "meshtastic",
@@ -34,6 +36,7 @@ dependencies = [
     "pytest-aiohttp",
     "requests",
     "requests-mock",
+    "schedule",
     "sentry-sdk",
 ]
 
