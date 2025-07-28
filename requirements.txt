@@ -30,7 +30,7 @@ cffi==1.17.1
     # via cryptography
 charset-normalizer==3.4.2
     # via requests
-coverage==7.9.2
+coverage==7.10.1
     # via pytest-cov
 cryptography==45.0.5
     # via bridger (pyproject.toml)
