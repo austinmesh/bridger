@@ -76,7 +76,7 @@ def test_create_gateway_user(gateway_manager, emqx_mock):
     emqx_mock.create_user_authorization_rules_built_in_database.assert_called_once_with(
         gateway.user_string,
         {
-            "rules": [{"action": "all", "topic": "egr/home/2/e/LongFast/!1a2b3c4d", "permission": "allow"}],
+            "rules": [{"action": "all", "topic": "fake/2/e/+/!1a2b3c4d", "permission": "allow"}],
             "username": gateway.user_string,
         },
     )
@@ -168,3 +168,116 @@ class TestGatewayDataNodeMixin:
         assert gateway.node_hex_id_with_bang == "!ffffffff"
         assert gateway.node_hex_id_without_bang == "ffffffff"
         assert gateway.color == "ffffff"
+
+
+# Test create_gateway_rules_dict static method
+def test_create_gateway_rules_dict():
+    """Test the static method that creates MQTT authorization rules dictionary"""
+    gateway_id = "!1a2b3c4d"
+    username = "12345-1a2b3c4d"
+
+    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(gateway_id, username)
+
+    expected_dict = {
+        "rules": [{"action": "all", "topic": "fake/2/e/+/!1a2b3c4d", "permission": "allow"}],
+        "username": "12345-1a2b3c4d",
+    }
+
+    assert rules_dict == expected_dict
+
+
+def test_create_gateway_rules_dict_without_bang():
+    """Test create_gateway_rules_dict with gateway_id without leading !"""
+    gateway_id = "1a2b3c4d"
+    username = "12345-1a2b3c4d"
+
+    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(gateway_id, username)
+
+    expected_dict = {
+        "rules": [{"action": "all", "topic": "fake/2/e/+/1a2b3c4d", "permission": "allow"}],
+        "username": "12345-1a2b3c4d",
+    }
+
+    assert rules_dict == expected_dict
+
+
+# Test update_gateway_user_rules method
+def test_update_gateway_user_rules_success(gateway_manager, emqx_mock):
+    """Test successful update of gateway user rules"""
+    # Mock the EMQX API calls
+    emqx_mock.delete_user_authorization_rules_built_in_database.return_value = None
+    emqx_mock.create_user_authorization_rules_built_in_database.return_value = None
+
+    # Execute the method under test
+    success = gateway_manager.update_gateway_user_rules("1a2b3c4d")
+
+    # Assertions
+    assert success is True
+
+    # Verify that delete_user_authorization_rules_built_in_database was called
+    emqx_mock.delete_user_authorization_rules_built_in_database.assert_called_once_with("1234567890-1a2b3c4d")
+
+    # Verify that create_user_authorization_rules_built_in_database was called with correct rules
+    expected_rules = {
+        "rules": [{"action": "all", "topic": "fake/2/e/+/!1a2b3c4d", "permission": "allow"}],
+        "username": "1234567890-1a2b3c4d",
+    }
+    emqx_mock.create_user_authorization_rules_built_in_database.assert_called_once_with(
+        "1234567890-1a2b3c4d", expected_rules
+    )  # noqa: E501
+
+
+def test_update_gateway_user_rules_with_bang(gateway_manager, emqx_mock):
+    """Test update_gateway_user_rules with gateway_id that has leading !"""
+    # Mock the EMQX API calls
+    emqx_mock.delete_user_authorization_rules_built_in_database.return_value = None
+    emqx_mock.create_user_authorization_rules_built_in_database.return_value = None
+
+    # Execute the method under test
+    success = gateway_manager.update_gateway_user_rules("!1a2b3c4d")
+
+    # Assertions
+    assert success is True
+
+    # Verify that the correct rules were created (should be the same regardless of input format)
+    expected_rules = {
+        "rules": [{"action": "all", "topic": "fake/2/e/+/!1a2b3c4d", "permission": "allow"}],
+        "username": "1234567890-1a2b3c4d",
+    }
+    emqx_mock.create_user_authorization_rules_built_in_database.assert_called_once_with(
+        "1234567890-1a2b3c4d", expected_rules
+    )  # noqa: E501
+
+
+def test_update_gateway_user_rules_gateway_not_found(gateway_manager, emqx_mock):
+    """Test update_gateway_user_rules when gateway doesn't exist"""
+    # Mock list_users to return empty data to simulate gateway not found
+    emqx_mock.list_users.return_value = {"data": []}
+
+    # Execute the method under test
+    success = gateway_manager.update_gateway_user_rules("nonexistent")
+
+    # Assertions
+    assert success is False
+
+    # Verify that EMQX API methods were not called since gateway wasn't found
+    emqx_mock.delete_user_authorization_rules_built_in_database.assert_not_called()
+    emqx_mock.create_user_authorization_rules_built_in_database.assert_not_called()
+
+
+def test_update_gateway_user_rules_emqx_error(gateway_manager, emqx_mock):
+    """Test update_gateway_user_rules when EMQX API calls fail"""
+    # Mock delete_user_authorization_rules_built_in_database to raise an exception
+    emqx_mock.delete_user_authorization_rules_built_in_database.side_effect = Exception("EMQX API error")
+
+    # Execute the method under test
+    success = gateway_manager.update_gateway_user_rules("1a2b3c4d")
+
+    # Assertions
+    assert success is False
+
+    # Verify that delete was attempted
+    emqx_mock.delete_user_authorization_rules_built_in_database.assert_called_once_with("1234567890-1a2b3c4d")
+
+    # Verify that create was not called due to the exception
+    emqx_mock.create_user_authorization_rules_built_in_database.assert_not_called()

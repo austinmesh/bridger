@@ -485,6 +485,63 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                 f"Failed to add annotation: {str(e)}", ephemeral=True, delete_after=self.delete_after
             )
 
+    @app_commands.check(is_bridger_admin)
+    @app_commands.command(
+        name="update-all-gateway-rules",
+        description="Update MQTT rules for all gateways to support wildcard channels",
+    )
+    async def update_all_gateway_rules(self, ctx: Interaction):
+        await ctx.response.defer(ephemeral=True)
+
+        try:
+            all_gateways = self.gateway_manager.list_gateways()
+        except Exception as e:
+            logger.error(f"Failed to list gateways: {e}")
+            await ctx.followup.send(f"Failed to list gateways: {str(e)}", ephemeral=True)
+            return
+
+        if not all_gateways:
+            await ctx.followup.send("No gateways found to update.", ephemeral=True)
+            return
+
+        total_gateways = len(all_gateways)
+        successful_updates = 0
+        failed_updates = []
+
+        for gateway in all_gateways:
+            try:
+                success = self.gateway_manager.update_gateway_user_rules(gateway.node_hex_id_without_bang)
+                if success:
+                    successful_updates += 1
+                    logger.info(f"Successfully updated rules for gateway {gateway.node_hex_id_without_bang}")
+                else:
+                    failed_updates.append(gateway.node_hex_id_without_bang)
+                    logger.warning(f"Failed to update rules for gateway {gateway.node_hex_id_without_bang}")
+            except Exception as e:
+                failed_updates.append(gateway.node_hex_id_without_bang)
+                logger.error(f"Exception updating rules for gateway {gateway.node_hex_id_without_bang}: {e}")
+
+        response = "Gateway rules update completed!\n\n"
+        response += f"**Total gateways:** {total_gateways}\n"
+        response += f"**Successful updates:** {successful_updates}\n"
+        response += f"**Failed updates:** {len(failed_updates)}\n"
+
+        if failed_updates:
+            response += "\n**Failed gateway IDs:**\n"
+            for failed_gateway in failed_updates[:10]:  # Limit to first 10 to avoid message length issues
+                response += f"• {failed_gateway}\n"
+            if len(failed_updates) > 10:
+                response += f"• ... and {len(failed_updates) - 10} more\n"
+
+        if successful_updates == total_gateways:
+            response += "\nAll gateway rules have been successfully updated to support wildcard channel subscriptions!"
+        elif successful_updates > 0:
+            response += "\nPartial success. Check logs for details on failed updates."
+        else:
+            response += "\nNo gateway rules were successfully updated. Check logs for errors."
+
+        await ctx.followup.send(response, ephemeral=True)
+
 
 def parse_time_string(time_str: str) -> Optional[int]:
     """Parse various time string formats to Unix timestamp.

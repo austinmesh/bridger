@@ -18,7 +18,7 @@ from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
 
-MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "LongFast")
+MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
 TEST_MESSAGE_MATCHERS = [
     re.compile(r"^.*$", flags=re.IGNORECASE) if os.getenv("TEST_MESSAGE_MATCH_ALL", "false").lower() == "true" else None,
