@@ -8,10 +8,10 @@ from typing import Generator, Union
 from discord import Member, User
 from requests import HTTPError
 
+from bridger.config import MQTT_TOPIC
 from bridger.dataclasses import NodeMixin
 from bridger.emqx import EMQXClient
 from bridger.log import logger
-from bridger.mqtt import MQTT_TOPIC
 
 EMQX_API_KEY = os.getenv("EMQX_API_KEY")
 EMQX_SECRET_KEY = os.getenv("EMQX_SECRET_KEY")
@@ -86,14 +86,18 @@ class GatewayManagerEMQX:
 
         return gateways
 
+    @staticmethod
+    def create_gateway_rules_dict(gateway_id: str, username: str) -> dict:
+        topic_prefix = MQTT_TOPIC.removesuffix("/#")
+        mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/+/{gateway_id}", "permission": "allow"}]
+        return {"rules": mqtt_rules, "username": username}
+
     def create_gateway_user(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
         gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
         password = self.generate_password()
 
-        topic_prefix = MQTT_TOPIC.removesuffix("/#")
-        mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/LongFast/{gateway_id}", "permission": "allow"}]
         gateway = GatewayData(node_id=node_id, owner_id=discord_user.id)
-        rules = {"rules": mqtt_rules, "username": gateway.user_string}
+        rules = self.create_gateway_rules_dict(gateway_id, gateway.user_string)
 
         try:
             self.emqx.create_user(self.authentication_id, gateway.user_string, password)
@@ -104,6 +108,18 @@ class GatewayManagerEMQX:
             else:
                 raise GatewayError(f"Gateway already exists: {e}", gateway)
         return gateway, password
+
+    def update_gateway_user_rules(self, gateway_id: str) -> bool:
+        try:
+            gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
+            gateway = self.get_gateway(gateway_id)
+            self.emqx.delete_user_authorization_rules_built_in_database(gateway.user_string)
+            rules = self.create_gateway_rules_dict(gateway_id, gateway.user_string)
+            self.emqx.create_user_authorization_rules_built_in_database(gateway.user_string, rules)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update gateway rules for {gateway_id}: {e}")
+            return False
 
     def delete_gateway_user(self, gateway_id: str) -> bool:
         try:

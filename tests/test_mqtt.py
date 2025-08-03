@@ -32,7 +32,7 @@ class TestBridgerMQTT:
     def test_on_connect_success(self, mqtt_client):
         mqtt_client.subscribe = MagicMock(return_value=(0, 1))
         mqtt_client.on_connect(mqtt_client, None, None, 0, None)
-        mqtt_client.subscribe.assert_called_once_with("egr/home/2/e/#")
+        mqtt_client.subscribe.assert_called_once_with("fake/2/e/#")
 
     def test_on_connect_failure(self, mqtt_client):
         mqtt_client.subscribe = MagicMock()
