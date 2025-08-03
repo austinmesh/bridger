@@ -3,5 +3,9 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "python.analysis.exclude": [
+        "**/exhook/proto/exhook_pb2.py",
+        "**/exhook/proto/exhook_pb2_grpc.py"
+    ]
 }

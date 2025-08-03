@@ -21,12 +21,24 @@
             "type": "debugpy",
             "request": "launch",
             "module": "bridger"
+        },
+        {
+            "name": "Virtual Node",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "bridger.virtual_node"
+        },
+        {
+            "name": "ExHook Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "bridger.exhook"
         }
     ],
     "compounds": [
         {
             "name": "All",
-            "configurations": ["Discord Bot", "HTTP Server", "Bridger"]
+            "configurations": ["Discord Bot", "HTTP Server", "Bridger", "Virtual Node", "ExHook Server"]
         },
         {
             "name": "Bot & HTTP Server",
