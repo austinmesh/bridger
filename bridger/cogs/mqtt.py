@@ -179,7 +179,7 @@ class GatewayPaginationView(ui.View):
 
             embed.add_field(
                 name="Gateway",
-                value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                 inline=False,
             )
 
@@ -222,7 +222,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         if isinstance(error, app_commands.errors.CommandInvokeError):
             if isinstance(error.original, GatewayError):
                 await interaction.response.send_message(
-                    f"Gateway already exists: {error.original.gateway.node_hex_id}",
+                    f"Gateway already exists: {error.original.gateway.node_hex_id_without_bang}",
                     ephemeral=True,
                     delete_after=self.delete_after,
                 )
@@ -248,7 +248,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def request_account(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
-        message = f"Gateway created for node **{gateway.node_hex_id}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
+        message = f"Gateway created for node **{gateway.node_hex_id_without_bang}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
 
         await ctx.response.send_message(message, ephemeral=True)
 
@@ -296,7 +296,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
                 embed.add_field(
                     name="Gateway",
-                    value=f"ID: **{gateway.node_hex_id}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                     inline=False,
                 )
 
@@ -324,7 +324,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         gateway, password = self.gateway_manager.reset_gateway_password(node_id, ctx.user)
 
         await ctx.response.send_message(
-            f"Gateway **{gateway.node_hex_id}** password reset. The username is **{gateway.user_string}** with new password: `{password}`",  # noqa: E501
+            f"Gateway **{gateway.node_hex_id_without_bang}** password reset. The username is **{gateway.user_string}** with new password: `{password}`",  # noqa: E501
             ephemeral=True,
         )
 
@@ -336,7 +336,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         if not tables:
             await ctx.response.send_message(
-                f"We haven't received any packets from **{gateway.node_hex_id}** in the last hour", ephemeral=True
+                f"We haven't received any packets from **{gateway.node_hex_id_without_bang}** in the last hour",
+                ephemeral=True,
             )
         else:
             records = tables[0].records
@@ -344,7 +345,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             packet_time = int(record.values.get("_time").timestamp())
 
             await ctx.response.send_message(
-                f"Gateway **{gateway.node_hex_id}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
+                f"Gateway **{gateway.node_hex_id_without_bang}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
                 ephemeral=True,
             )
 
