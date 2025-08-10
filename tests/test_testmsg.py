@@ -58,19 +58,21 @@ class TestTestMsgCog:
 
     def test_deduplicator_processes_unique_message(self, testmsg_cog, mock_service_envelope):
         assert testmsg_cog.deduplicator.should_process(mock_service_envelope)
-        assert 12345 in testmsg_cog.deduplicator.message_queue
+        assert ("!1a2b3c4d", 12345) in testmsg_cog.deduplicator.message_queue
 
-    def test_deduplicator_skips_duplicate_message(self, testmsg_cog, mock_service_envelope, mock_service_envelope_duplicate):
+    def test_deduplicator_processes_same_packet_different_gateway(
+        self, testmsg_cog, mock_service_envelope, mock_service_envelope_duplicate
+    ):
         assert testmsg_cog.deduplicator.should_process(mock_service_envelope)
-        assert not testmsg_cog.deduplicator.should_process(mock_service_envelope_duplicate)
+        assert testmsg_cog.deduplicator.should_process(mock_service_envelope_duplicate)
 
     def test_deduplicator_processes_different_messages(
         self, testmsg_cog, mock_service_envelope, mock_service_envelope_different
     ):
         assert testmsg_cog.deduplicator.should_process(mock_service_envelope)
         assert testmsg_cog.deduplicator.should_process(mock_service_envelope_different)
-        assert 12345 in testmsg_cog.deduplicator.message_queue
-        assert 67890 in testmsg_cog.deduplicator.message_queue
+        assert ("!1a2b3c4d", 12345) in testmsg_cog.deduplicator.message_queue
+        assert ("!1a2b3c4d", 67890) in testmsg_cog.deduplicator.message_queue
 
     @patch("bridger.cogs.testmsg.PBPacketProcessor")
     def test_mqtt_processing_skips_duplicate_packets(self, mock_processor_class, testmsg_cog, mock_service_envelope):
@@ -108,7 +110,7 @@ class TestTestMsgCog:
             assert processor.data.text == "!test message"
 
     def test_deduplicator_bounded_queue_behavior(self, testmsg_cog):
-        testmsg_cog.deduplicator = PacketDeduplicator(maxlen=3)
+        testmsg_cog.deduplicator = PacketDeduplicator(maxlen=3, use_gateway_id=True)
 
         for i in range(3):
             envelope = MagicMock()
@@ -117,9 +119,9 @@ class TestTestMsgCog:
             testmsg_cog.deduplicator.mark_processed(envelope)
 
         assert len(testmsg_cog.deduplicator.message_queue) == 3
-        assert 0 in testmsg_cog.deduplicator.message_queue
-        assert 1 in testmsg_cog.deduplicator.message_queue
-        assert 2 in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 0) in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 1) in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 2) in testmsg_cog.deduplicator.message_queue
 
         envelope = MagicMock()
         envelope.packet.id = 3
@@ -127,10 +129,10 @@ class TestTestMsgCog:
         testmsg_cog.deduplicator.mark_processed(envelope)
 
         assert len(testmsg_cog.deduplicator.message_queue) == 3
-        assert 0 not in testmsg_cog.deduplicator.message_queue
-        assert 1 in testmsg_cog.deduplicator.message_queue
-        assert 2 in testmsg_cog.deduplicator.message_queue
-        assert 3 in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 0) not in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 1) in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 2) in testmsg_cog.deduplicator.message_queue
+        assert ("!test", 3) in testmsg_cog.deduplicator.message_queue
 
     @patch("bridger.deduplication.logger")
     def test_deduplicator_logs_duplicate_detection(self, mock_logger, testmsg_cog, mock_service_envelope):
@@ -138,7 +140,7 @@ class TestTestMsgCog:
         testmsg_cog.deduplicator.is_duplicate(mock_service_envelope)
         mock_logger.bind.assert_called_with(envelope_id=12345)
 
-    def test_integration_deduplication_prevents_discord_spam(self, testmsg_cog):
+    def test_integration_deduplication_processes_different_gateways(self, testmsg_cog):
         envelope1 = MagicMock()
         envelope1.packet.id = 99999
         envelope1.gateway_id = "!gateway1"
@@ -146,6 +148,21 @@ class TestTestMsgCog:
         envelope2 = MagicMock()
         envelope2.packet.id = 99999
         envelope2.gateway_id = "!gateway2"
+
+        should_process_first = testmsg_cog.deduplicator.should_process(envelope1)
+        assert should_process_first
+
+        should_process_second = testmsg_cog.deduplicator.should_process(envelope2)
+        assert should_process_second
+
+    def test_integration_deduplication_prevents_true_duplicates(self, testmsg_cog):
+        envelope1 = MagicMock()
+        envelope1.packet.id = 99999
+        envelope1.gateway_id = "!gateway1"
+
+        envelope2 = MagicMock()
+        envelope2.packet.id = 99999
+        envelope2.gateway_id = "!gateway1"
 
         should_process_first = testmsg_cog.deduplicator.should_process(envelope1)
         assert should_process_first
