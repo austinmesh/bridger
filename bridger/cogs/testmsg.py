@@ -27,6 +27,7 @@ TEST_MESSAGE_MATCHERS = [
 
 
 class TestMsg(commands.GroupCog, name="testmsg"):
+    __test__ = False  # Disable pytest discovery for this cog
     queue = SimpleMemoryCache()
 
     def __init__(self, bot: commands.Bot, discord_channel_id: int, influx_reader: InfluxReader):
@@ -34,7 +35,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel_id = discord_channel_id
         self.discord_channel = None
         self.influx_reader = influx_reader
-        self.deduplicator = PacketDeduplicator(maxlen=100)
+        self.deduplicator = PacketDeduplicator(maxlen=100, use_gateway_id=True)
 
     @commands.Cog.listener(name="on_ready")
     async def on_ready(self):

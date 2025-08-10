@@ -6,14 +6,14 @@ from bridger.dataclasses import NodeData, NodeMixin
 
 
 @dataclass
-class TestNodeWithNodeId(NodeMixin):
+class NodeWithNodeId(NodeMixin):
     """Test class with node_id attribute"""
 
     node_id: int
 
 
 @dataclass
-class TestNodeWithFrom(NodeMixin):
+class NodeWithFrom(NodeMixin):
     """Test class with _from attribute (like TelemetryPoint)"""
 
     _from: int
@@ -24,27 +24,27 @@ class TestNodeMixin:
 
     def test_node_hex_id_with_bang_from_node_id(self):
         """Test hex ID conversion from node_id attribute"""
-        node = TestNodeWithNodeId(node_id=439041101)  # 0x1a2b3c4d
+        node = NodeWithNodeId(node_id=439041101)  # 0x1a2b3c4d
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
         assert node.color == "2b3c4d"
 
     def test_node_hex_id_with_bang_from_from_attribute(self):
         """Test hex ID conversion from _from attribute"""
-        node = TestNodeWithFrom(_from=439041101)  # 0x1a2b3c4d
+        node = NodeWithFrom(_from=439041101)  # 0x1a2b3c4d
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
         assert node.node_hex_id_without_bang == "1a2b3c4d"
         assert node.color == "2b3c4d"
 
     def test_node_hex_id_padding(self):
         """Test that hex IDs are properly zero-padded to 8 characters"""
-        node = TestNodeWithNodeId(node_id=255)  # 0xff
+        node = NodeWithNodeId(node_id=255)  # 0xff
         assert node.node_hex_id_with_bang == "!000000ff"
         assert node.node_hex_id_without_bang == "000000ff"
 
     def test_node_hex_id_large_numbers(self):
         """Test hex ID conversion with large numbers"""
-        node = TestNodeWithNodeId(node_id=4294967295)  # 0xffffffff
+        node = NodeWithNodeId(node_id=4294967295)  # 0xffffffff
         assert node.node_hex_id_with_bang == "!ffffffff"
         assert node.node_hex_id_without_bang == "ffffffff"
 
@@ -52,10 +52,10 @@ class TestNodeMixin:
         """Test that missing required attributes raises AttributeError"""
 
         @dataclass
-        class TestNodeEmpty(NodeMixin):
+        class NodeEmpty(NodeMixin):
             other_field: str
 
-        node = TestNodeEmpty(other_field="test")
+        node = NodeEmpty(other_field="test")
 
         with pytest.raises(AttributeError) as exc_info:
             _ = node.node_hex_id_with_bang
@@ -66,25 +66,25 @@ class TestNodeMixin:
         """Test that _from attribute takes priority over node_id"""
 
         @dataclass
-        class TestNodeBoth(NodeMixin):
+        class NodeBoth(NodeMixin):
             _from: int
             node_id: int
 
-        node = TestNodeBoth(_from=439041101, node_id=123456)  # Should use _from
+        node = NodeBoth(_from=439041101, node_id=123456)  # Should use _from
         assert node.node_hex_id_with_bang == "!1a2b3c4d"
 
     def test_color_property_various_scenarios(self):
         """Test color property extraction in various scenarios"""
         # Test with short hex (should take last 6 chars after padding)
-        node1 = TestNodeWithNodeId(node_id=255)  # 0x000000ff
+        node1 = NodeWithNodeId(node_id=255)  # 0x000000ff
         assert node1.color == "0000ff"
 
         # Test with full hex
-        node2 = TestNodeWithNodeId(node_id=0xFFA2B3C4)
+        node2 = NodeWithNodeId(node_id=0xFFA2B3C4)
         assert node2.color == "a2b3c4"
 
         # Test with direct node_id input
-        node3 = TestNodeWithNodeId(node_id=0x12345678)
+        node3 = NodeWithNodeId(node_id=0x12345678)
         assert node3.color == "345678"
 
 

@@ -12,8 +12,8 @@ async def test_client(aiohttp_client):
         mock_instance = AsyncMock()
         mock_device.return_value = mock_instance
         app = create_app()
+        app["device"] = mock_instance  # Set state before starting client to avoid deprecation warning
         client = await aiohttp_client(app)
-        app["device"] = mock_instance
         yield client
 
 
