@@ -7,7 +7,6 @@ from typing import List, Literal, Optional
 from discord import ButtonStyle, Embed, Interaction, app_commands, ui
 from discord.ext import commands
 from discord.utils import get
-from influxdb_client import InfluxDBClient
 
 from bridger.dataclasses import AnnotationPoint
 from bridger.gateway import GatewayError, GatewayManagerEMQX, emqx
@@ -16,10 +15,6 @@ from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
 
-influx_client: InfluxDBClient = InfluxDBClient.from_env_properties()
-query_client = influx_client.query_api()
-influx_reader = InfluxReader(influx_client)
-
 
 async def node_id_autocomplete(interaction: Interaction, current: str) -> List[app_commands.Choice[str]]:
     """Autocomplete function for node_id parameter."""
@@ -27,6 +22,7 @@ async def node_id_autocomplete(interaction: Interaction, current: str) -> List[a
         logger.debug(f"Autocomplete called with current='{current}'")
 
         # Get all known node IDs with display names from InfluxDB
+        influx_reader = InfluxReader(interaction.client.influx_client)
         nodes = influx_reader.get_all_node_ids()
         logger.debug(f"Found {len(nodes)} nodes from InfluxDB")
 
@@ -211,9 +207,10 @@ class GatewayPaginationView(ui.View):
 class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     delete_after = None
 
-    def __init__(self, bot: commands.Bot, gateway_manager: GatewayManagerEMQX):
+    def __init__(self, bot: commands.Bot, gateway_manager: GatewayManagerEMQX, influx_reader: InfluxReader):
         self.bot = bot
         self.gateway_manager = gateway_manager
+        self.influx_reader = influx_reader
 
     async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError):
         # Log the type of error and error message
@@ -332,7 +329,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def is_alive(self, ctx: Interaction, node_id: str):
         gateway = self.gateway_manager.get_gateway(node_id)
-        tables = influx_reader.get_recent_packets(gateway.node_hex_id_with_bang)
+        tables = self.influx_reader.get_recent_packets(gateway.node_hex_id_with_bang)
 
         if not tables:
             await ctx.response.send_message(
@@ -459,7 +456,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         # Write to InfluxDB
         try:
-            writer = InfluxWriter(influx_client)
+            writer = InfluxWriter(self.bot.influx_client)
             writer.write_annotation(annotation)
 
             # Build response message
@@ -599,4 +596,5 @@ def parse_time_string(time_str: str) -> Optional[int]:
 
 async def setup(bot):
     gateway_manager = GatewayManagerEMQX(emqx)
-    await bot.add_cog(MQTTCog(bot, gateway_manager))
+    influx_reader = InfluxReader(influx_client=bot.influx_client)
+    await bot.add_cog(MQTTCog(bot, gateway_manager, influx_reader))

@@ -4,6 +4,7 @@ from aiohttp import ClientConnectorError
 from discord import Intents
 from discord.ext import commands
 
+from bridger.influx import create_influx_client
 from bridger.log import logger
 
 try:
@@ -18,14 +19,18 @@ class BridgerBot(commands.Bot):
     def __init__(self, **kwargs):
         super().__init__(command_prefix="./bridger ", **kwargs)
 
+        self.influx_client = None
         self.initial_extensions = [
             "bridger.cogs.mqtt",
             "bridger.cogs.testmsg",
         ]
 
     async def setup_hook(self):
+        self.influx_client = create_influx_client("bot")
+
         for ext in self.initial_extensions:
             await self.load_extension(ext)
+            logger.info(f"Loaded extension: {ext}")
 
 
 intents = Intents.default()

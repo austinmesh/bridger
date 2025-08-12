@@ -2,15 +2,15 @@ import base64
 from argparse import ArgumentParser
 
 from google.protobuf.message import DecodeError
-from influxdb_client import InfluxDBClient
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 
+from bridger.influx import create_influx_client
 from bridger.log import file_logger, logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 
 if __name__ == "__main__":
     logger.remove(file_logger)
-    influx_client = InfluxDBClient.from_env_properties()
+    influx_client = create_influx_client("cli")
     parser = ArgumentParser()
     parser.add_argument("packet", help="Base64 encoded protobuf message")
     args = parser.parse_args()

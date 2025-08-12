@@ -7,9 +7,9 @@ import aiomqtt
 from aiocache import SimpleMemoryCache
 from discord import Embed, Message
 from discord.ext import commands
-from influxdb_client import InfluxDBClient
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
 from bridger.dataclasses import NodeData, TextMessagePoint
@@ -97,11 +97,18 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         message.embeds.append(self.create_embed(envelope))
         await message.edit(embeds=message.embeds)
 
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        retry=retry_if_exception_type((aiomqtt.MqttError, ConnectionRefusedError, OSError)),
+        reraise=True,
+    )
     async def run_mqtt(self):
         topic = MQTT_TOPIC.removesuffix("/#")
         channel = MQTT_TEST_CHANNEL_MESHTASTIC
         full_topic = f"{topic}/{channel}/#"
 
+        logger.info(f"Attempting to connect to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
         async with aiomqtt.Client(
             MQTT_BROKER,
             MQTT_PORT,
@@ -186,8 +193,7 @@ def restart_mqtt_on_exception(task, bot: commands.Bot):
 
 
 async def setup(bot: commands.Bot):
-    influx_client = InfluxDBClient.from_env_properties()
-    influx_reader = InfluxReader(influx_client=influx_client)
+    influx_reader = InfluxReader(influx_client=bot.influx_client)
     await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_DISCORD, influx_reader))
     run_mqtt_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
     run_mqtt_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))
