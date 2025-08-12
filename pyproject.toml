@@ -35,6 +35,7 @@ dependencies = [
     "requests",
     "requests-mock",
     "sentry-sdk",
+    "tenacity",
 ]
 
 [project.urls]
