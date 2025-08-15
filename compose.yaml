@@ -169,9 +169,11 @@ services:
       - GF_SERVER_PROTOCOL
       - GF_RENDERING_SERVER_URL
       - GF_RENDERING_CALLBACK_URL
-      # - GF_INSTALL_PLUGINS=influxdb
+      - INFLUXDB_V2_TOKEN
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/mnt/dashboards
       - grafana-storage:/var/lib/grafana
     networks:
       - bridger
@@ -188,6 +190,8 @@ services:
     networks:
       - bridger
     restart: always
+    profiles:
+      - image-renderer
 
   loki:
     image: docker.io/grafana/loki:3.4.4
@@ -200,14 +204,22 @@ services:
       - bridger
     restart: always
 
-  promtail:
-    image: docker.io/grafana/promtail:3.4.4
-    hostname: promtail
-    command: ["-config.file=/mnt/config/promtail.yaml"]
+  alloy:
+    image: docker.io/grafana/alloy:v1.10.2
+    hostname: alloy
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /mnt/config/config-docker.alloy
+    ports:
+      - "12345:12345"
+    security_opt:
+      - label=disable
     volumes:
-      - ./config/loki:/mnt/config
-      - bridger-data:/var/lib/bridger
-      - promtail-data:/var/lib/promtail
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/alloy:/mnt/config
+      - alloy-data:/var/lib/alloy
     networks:
       - bridger
     restart: always
@@ -238,6 +250,8 @@ networks:
     driver: bridge
 
 volumes:
+  alloy-data:
+    driver: local
   bridger-data:
     driver: local
   emqx-config:
@@ -255,6 +269,4 @@ volumes:
   certbot-conf:
     driver: local
   certbot-data:
-    driver: local
-  promtail-data:
     driver: local
