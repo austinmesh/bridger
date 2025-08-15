@@ -1,0 +1,14 @@
+datasources:
+  - name: loki
+    type: loki
+    url: http://loki:3100
+  - name: influxdb
+    type: influxdb
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: $INFLUXDB_V2_ORG
+      defaultBucket: $INFLUXDB_V2_bucket
+      tlsSkipVerify: false
+    secureJsonData:
+      token: $INFLUXDB_V2_TOKEN

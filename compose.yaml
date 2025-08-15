@@ -1,0 +1,260 @@
+services:
+  bridger:
+    image: ${IMAGE:-ghcr.io/austinmesh/bridger:latest}
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: bridger
+    environment:
+      - INFLUXDB_V2_URL=http://influxdb:8086
+      - MQTT_BROKER=emqx
+      - LOG_PATH=/var/lib/bridger/logs/bridger.log
+      - TZ
+      - MQTT_TOPIC
+      - MQTT_USER
+      - MQTT_PASS
+      - MQTT_CLIENT_ID
+      - INFLUXDB_V2_ORG
+      - INFLUXDB_V2_TOKEN
+      - INFLUXDB_V2_BUCKET
+      - EMQX_API_KEY
+      - EMQX_SECRET_KEY
+      - EMQX_URL=http://emqx:18083
+      - TEST_MESSAGE_MATCH_ALL
+      - BRIDGER_PKI_PRIVATE_KEY
+      - BRIDGER_PKI_PUBLIC_KEY
+      - LOGURU_LEVEL=${LOGURU_LEVEL:-INFO}
+    volumes:
+      - bridger-data:/var/lib/bridger
+    networks:
+      - bridger
+    restart: always
+    depends_on:
+      - influxdb
+      - emqx
+
+  bot:
+    image: ${IMAGE:-ghcr.io/austinmesh/bridger:latest}
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: bot
+    command: python -m bridger.bot
+    environment:
+      - INFLUXDB_V2_URL=http://influxdb:8086
+      - MQTT_BROKER=emqx
+      - LOG_PATH=/var/lib/bridger/logs/bot.log
+      - TZ
+      - MQTT_TOPIC
+      - MQTT_USER
+      - MQTT_PASS
+      - MQTT_CLIENT_ID
+      - INFLUXDB_V2_ORG
+      - INFLUXDB_V2_TOKEN
+      - INFLUXDB_V2_BUCKET
+      - EMQX_API_KEY
+      - EMQX_SECRET_KEY
+      - EMQX_URL=http://emqx:18083
+      - DISCORD_BOT_TOKEN
+      - DISCORD_BOT_OWNER_ID
+      - TEST_MESSAGE_MATCH_ALL
+      - BRIDGER_PKI_PRIVATE_KEY
+      - BRIDGER_PKI_PUBLIC_KEY
+      - LOGURU_LEVEL=${LOGURU_LEVEL:-INFO}
+    volumes:
+      - bridger-data:/var/lib/bridger
+    networks:
+      - bridger
+    restart: always
+    depends_on:
+      - influxdb
+      - emqx
+
+  http:
+    image: ${IMAGE:-ghcr.io/austinmesh/bridger:latest}
+    build:
+      context: .
+      dockerfile: Containerfile
+    hostname: http
+    command: python -m bridger.http
+    environment:
+      - INFLUXDB_V2_URL=http://influxdb:8086
+      - MQTT_BROKER=emqx
+      - LOG_PATH=/var/lib/bridger/logs/http.log
+      - TZ
+      - MQTT_TOPIC
+      - MQTT_USER
+      - MQTT_PASS
+      - MQTT_CLIENT_ID
+      - INFLUXDB_V2_ORG
+      - INFLUXDB_V2_TOKEN
+      - INFLUXDB_V2_BUCKET
+      - EMQX_API_KEY
+      - EMQX_SECRET_KEY
+      - EMQX_URL=http://emqx:18083
+      - TEST_MESSAGE_MATCH_ALL
+      - BRIDGER_PKI_PRIVATE_KEY
+      - BRIDGER_PKI_PUBLIC_KEY
+      - LOGURU_LEVEL=${LOGURU_LEVEL:-INFO}
+    ports:
+      - "8080:8080"
+    volumes:
+      - bridger-data:/var/lib/bridger
+    networks:
+      - bridger
+    restart: always
+    depends_on:
+      - influxdb
+      - emqx
+
+  emqx:
+    image: docker.io/emqx/emqx:5.10.0
+    hostname: emqx
+    environment:
+      - EMQX_ALLOW_ANONYMOUS
+      - EMQX_DEFAULT_LOG_HANDLER
+      - EMQX_LISTENER__SSL__KEYFILE
+      - EMQX_LISTENER__SSL__CERTFILE
+      - EMQX_LISTENER__WSS__KEYFILE
+      - EMQX_LISTENER__WSS__CERTFILE
+      - EMQX_NODE__COOKIE
+      - EMQX_HOST
+      - EMQX_API_KEY__BOOTSTRAP_FILE=/opt/emqx/etc/api_key.bootstrap
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "8084:8084"
+      - "8883:8883"
+      - "18083:18083"
+    volumes:
+      - emqx-config:/opt/emqx/etc
+      - emqx-data:/opt/emqx/data
+      - certbot-conf:/etc/letsencrypt
+    networks:
+      - bridger
+    restart: always
+
+  influxdb:
+    image: docker.io/library/influxdb:2.7.12
+    hostname: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_V2_USERNAME:-bridger}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_V2_PASSWORD:-br1dg3rp4ss}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_V2_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_V2_BUCKET:-meshtastic}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_V2_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+      - emqx-config:/opt/emqx/etc
+    networks:
+      - bridger
+    restart: always
+
+  grafana:
+    image: docker.io/grafana/grafana-oss:12.0.2
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED
+      - GF_AUTH_ANONYMOUS_ORG_ROLE
+      - GF_AUTH_ANONYMOUS_ORG_NAME
+      - GF_AUTH_ANONYMOUS_HIDE_VERSION
+      - GF_SECURITY_ALLOW_EMBEDDING
+      - GF_SERVER_ROOT_URL
+      - GF_SERVER_PROTOCOL
+      - GF_RENDERING_SERVER_URL
+      - GF_RENDERING_CALLBACK_URL
+      # - GF_INSTALL_PLUGINS=influxdb
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - bridger
+    restart: always
+
+  grafana-image-renderer:
+    image: docker.io/grafana/grafana-image-renderer:3.12.3
+    hostname: image-renderer
+    environment:
+      - HTTP_PORT=8088
+      - HTTP_HOST=0.0.0.0
+      - XDG_CONFIG_HOME=/tmp/.chromium
+      - XDG_CACHE_HOME=/tmp/.chromium
+    networks:
+      - bridger
+    restart: always
+
+  loki:
+    image: docker.io/grafana/loki:3.4.4
+    hostname: loki
+    command: ["-config.file=/mnt/config/loki.yaml"]
+    volumes:
+      - ./config/loki:/mnt/config
+      - loki-data:/var/lib/loki
+    networks:
+      - bridger
+    restart: always
+
+  promtail:
+    image: docker.io/grafana/promtail:3.4.4
+    hostname: promtail
+    command: ["-config.file=/mnt/config/promtail.yaml"]
+    volumes:
+      - ./config/loki:/mnt/config
+      - bridger-data:/var/lib/bridger
+      - promtail-data:/var/lib/promtail
+    networks:
+      - bridger
+    restart: always
+    depends_on:
+      - loki
+
+  certbot:
+    image: docker.io/certbot/certbot:v4.1.1
+    hostname: certbot
+    command: ["certonly", "--standalone", "--non-interactive", "--agree-tos", "-d", "${CERTBOT_DOMAIN:-mybridger.com}", "--email", "${CERTBOT_EMAIL:-my@emailaddress.com}"]
+    ports:
+      - "8094:80"
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-data:/var/lib/letsencrypt
+    networks:
+      - bridger
+    environment:
+      - CERTBOT_DOMAIN
+      - CERTBOT_EMAIL
+    restart: "no"
+    profiles:
+      - tools
+      - tls
+
+networks:
+  bridger:
+    driver: bridge
+
+volumes:
+  bridger-data:
+    driver: local
+  emqx-config:
+    driver: local
+  emqx-data:
+    driver: local
+  influxdb-data:
+    driver: local
+  influxdb-config:
+    driver: local
+  grafana-storage:
+    driver: local
+  loki-data:
+    driver: local
+  certbot-conf:
+    driver: local
+  certbot-data:
+    driver: local
+  promtail-data:
+    driver: local

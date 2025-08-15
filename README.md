@@ -63,3 +63,51 @@ MQTT Module:
 Primary Channel:
 
 * Uplink Enabled: `Checked`
+
+## Podman / Docker
+
+You can run Bridger in a container setup using Docker or Podman Compose. You'll need to set up the `.env` file as above first. You can start by copuing the `.env.default` file to `.env` and editing it.
+
+## Initial Bootstrap
+
+Start by building the images required:
+
+```bash
+podman compose build
+```
+
+Then create the InfluxDB and EMQX keys that need to go in the `.env` file. You can do this by running the following command:
+
+```bash
+podman compose run --rm -v emqx-config:/opt/emqx/etc bridger python3 -m bridger.cli generate-apikey
+```
+
+Replace the keys it outputs in the `.env` file. These get written to the EMQX config volume so you only need to do this once.
+
+Now you need to create a user for Bridger in EMQX. You can do this by running the following command (replacing your node ID and Discord ID):
+
+```bash
+podman compose run --rm bridger python3 -m bridger.cli create-user 934ccc74 206914075391688704
+```
+
+### EMQX
+
+The default EMQX username and password is `admin` / `public`. You will be forced to change this at first login. But you'll already have an API key for Bridger created form the previous steps.
+
+### InfluxDB
+
+You'll need to bootstrap some of InfluxDB. Navigate to http://localhost:8086 and create a user, organization and bucket. The names of these need to match what you put in the `.env` file.
+
+### Run
+
+You can start the containers using:
+
+```bash
+podman compose up -d
+```
+
+### URLs
+
+ - EMQX Dashboard: http://localhost:18083
+ - InfluxDB Dashboard: http://localhost:8086
+ - Grafana Dashboard: http://localhost:3000
