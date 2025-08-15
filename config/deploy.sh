@@ -11,6 +11,7 @@ export IMAGE="${IMAGE:-ghcr.io/austinmesh/bridger:latest}"
 
 mkdir -p "$UNIT_LOCATION" "$CONFIG_LOCATION"
 cp -r config/loki/* "$CONFIG_LOCATION"
+cp -r config/alloy/* "$CONFIG_LOCATION"
 cp -r $QUADLET_LOCATION/* "$UNIT_LOCATION"
 
 for service in bridger bot http; do
