@@ -63,3 +63,11 @@ MQTT Module:
 Primary Channel:
 
 * Uplink Enabled: `Checked`
+
+## Podman / Docker
+
+You can run Bridger in a container setup using Dpcker or Podman Compose. You'll need to set up the `.env` file as above first.
+
+Then you can run:
+
+```bash
