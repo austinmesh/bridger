@@ -7,7 +7,7 @@ UNIT_LOCATION="$HOME/.config/containers/systemd"
 CONFIG_LOCATION="$HOME/.config/bridger"
 SERVICES=($(ls -1 "$QUADLET_LOCATION" | grep -E '\.container$' | sed 's/\.container$//'))
 
-export IMAGE="${IMAGE:-ghcr.io/austinmesh/bridger:lastest}"
+export IMAGE="${IMAGE:-ghcr.io/austinmesh/bridger:latest}"
 
 mkdir -p "$UNIT_LOCATION" "$CONFIG_LOCATION"
 cp -r config/loki/* "$CONFIG_LOCATION"
