@@ -81,7 +81,7 @@ propcache==0.3.2
     # via
     #   aiohttp
     #   yarl
-protobuf==6.31.1
+protobuf==6.32.0
     # via
     #   bridger (pyproject.toml)
     #   meshtastic
