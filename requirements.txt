@@ -58,7 +58,7 @@ marshmallow==3.26.1
     # via dataclasses-json
 meshtastic==2.7.0
     # via bridger (pyproject.toml)
-multidict==6.6.3
+multidict==6.6.4
     # via
     #   aiohttp
     #   yarl
