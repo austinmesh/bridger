@@ -2,8 +2,6 @@ name: build
 
 on:
   push:
-    tags:
-      - '*.*.*'
     branches:
       - main
   pull_request:
@@ -12,6 +10,9 @@ on:
   merge_group:
     types:
       - checks_requested
+  release:
+    types:
+      - published
 
 jobs:
   linting:
@@ -149,21 +150,15 @@ jobs:
       - build
       - test
       - linting
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - uses: actions/checkout@v5.0.0
         with:
           fetch-depth: 0
 
-      - name: Extract tag from ref
-        id: extract_tag
-        run: |
-          TAG=$(echo ${{ github.ref }} | sed 's#refs/tags/##')
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-
       - name: Create Sentry release with shell
         run: |
-          RELEASE="${SENTRY_PROJECT}@${{ steps.extract_tag.outputs.tag }}"
+          RELEASE="${SENTRY_PROJECT}@${{ github.event.release.tag_name }}"
 
           sentry-cli releases new $RELEASE
           sentry-cli releases set-commits --auto --ignore-missing $RELEASE
@@ -177,4 +172,15 @@ jobs:
       - name: Deploy Quadlets
         run: config/deploy.sh
         env:
-          IMAGE: ghcr.io/${{ github.repository }}:${{ steps.extract_tag.outputs.tag }}
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+
+      - name: Notify Discord
+        uses: appleboy/discord-action@v1.2.0
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          username: "Bridger"
+          avatar_url: "https://raw.githubusercontent.com/austinmesh/bridger/${{ github.ref }}/logo/logo.png"
+          message: |
+            Deployed Bridger version: ${{ github.event.release.tag_name }}
+
+            ${{ github.event.release.body }}
