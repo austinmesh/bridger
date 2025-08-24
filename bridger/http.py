@@ -67,6 +67,12 @@ async def get_displaynames_all(request):
     return web.json_response(displaynames)
 
 
+@routes.get("/logo/logo.png")
+async def get_logo(request):
+    logo_path = os.path.join(os.path.dirname(__file__), "../logo/logo.png")
+    return web.FileResponse(logo_path)
+
+
 @routes.get("/health")
 async def health_check(request):
     return web.json_response({"status": "ok", "version": VERSION})
