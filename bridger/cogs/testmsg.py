@@ -63,6 +63,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         snr = packet.rx_snr
         rssi = packet.rx_rssi
         hop_count = None
+        hop_start = packet.hop_start
         formatted_time = datetime.fromtimestamp(packet.rx_time).strftime("%H:%M:%S")
 
         if packet.hop_start > 0:
@@ -83,9 +84,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         embed.add_field(name="RSSI", value=rssi, inline=True)
 
         if hop_count == 0:
-            embed.add_field(name="Hops", value="Direct", inline=True)
+            embed.add_field(name="Hops", value=f"Direct/{hop_start}", inline=True)
         elif hop_count is not None:
-            embed.add_field(name="Hops", value=hop_count, inline=True)
+            embed.add_field(name="Hops", value=f"{hop_count}/{hop_start}", inline=True)
 
         return embed
 
