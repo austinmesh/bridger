@@ -67,9 +67,9 @@ async def get_displaynames_all(request):
     return web.json_response(displaynames)
 
 
-@routes.get("/logo/logo.png")
-async def get_logo(request):
     logo_path = os.path.join(os.path.dirname(__file__), "../logo/logo.png")
+    if not os.path.exists(logo_path):
+        return web.Response(status=404, text="Logo not found")
     return web.FileResponse(logo_path)
 
 
