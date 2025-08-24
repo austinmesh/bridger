@@ -66,8 +66,28 @@ Primary Channel:
 
 ## Podman / Docker
 
-You can run Bridger in a container setup using Dpcker or Podman Compose. You'll need to set up the `.env` file as above first.
+You can run Bridger in a container setup using Dpcker or Podman Compose. You'll need to set up the `.env` file as above first. You can start by copuing the `.env.default` file to `.env` and editing it.
 
-Then you can run:
+Start by building the images required:
 
 ```bash
+podman compose build
+```
+
+Then create the InfluxDB and EMQX keys that need to go in the `.env` file. You can do this by running the following command:
+
+```bash
+podman compose run --rm -v emqx-config:/opt/emqx/etc bridger /app/config/generate_apikey.sh
+```
+
+Replace the keys it outputs in the `.env` file. These get written to the EMQX config volume so you only need to do this once.
+
+Now you need to create a user for Bridger in EMQX. You can do this by running the following command (replacing your node ID and Discord ID):
+
+```bash
+podman compose run --help --rm bridger python3 -m bridger.gateway create-user 934ccc74 206914075391688704
+```
+
+## EMQX
+
+The default EMQX username and password is `admin` / `public`. You will be forced to change this at first login. But you'll already have an API key for Bridger created form the previous steps.
