@@ -175,12 +175,12 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
 
       - name: Notify Discord
-        uses: appleboy/discord-action@v1.2.0
+        uses: tsickert/discord-webhook@v7.0.0
         with:
-          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
           username: "Bridger"
-          avatar_url: "https://raw.githubusercontent.com/austinmesh/bridger/${{ github.ref }}/logo/logo.png"
-          message: |
+          avatar-url: "https://raw.githubusercontent.com/austinmesh/bridger/${{ github.ref }}/logo/logo.png"
+          content: |
             Deployed Bridger version: ${{ github.event.release.tag_name }}
 
             ${{ github.event.release.body }}
