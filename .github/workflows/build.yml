@@ -176,7 +176,7 @@ jobs:
         with:
           webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
           username: "Bridger"
-          avatar-url: "https://raw.githubusercontent.com/austinmesh/bridger/${{ github.ref }}/logo/logo.png"
+          flags: 4
           content: |
             Deployed Bridger version: ${{ github.event.release.tag_name }}
 
