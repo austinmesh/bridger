@@ -113,7 +113,7 @@ pyyaml==6.0.2
     # via meshtastic
 reactivex==4.0.4
     # via influxdb-client
-requests==2.32.4
+requests==2.32.5
     # via
     #   bridger (pyproject.toml)
     #   meshtastic
