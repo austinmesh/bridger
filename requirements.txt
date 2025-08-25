@@ -38,7 +38,7 @@ dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
 dbus-fast==2.44.3
     # via bleak
-discord-py==2.5.2
+discord-py==2.6.2
     # via bridger (pyproject.toml)
 frozenlist==1.7.0
     # via
