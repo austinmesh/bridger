@@ -128,7 +128,7 @@ tabulate==0.9.0
     # via meshtastic
 tenacity==9.1.2
     # via bridger (pyproject.toml)
-typing-extensions==4.14.1
+typing-extensions==4.15.0
     # via
     #   aiosignal
     #   reactivex
