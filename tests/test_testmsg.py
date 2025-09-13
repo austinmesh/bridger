@@ -169,3 +169,38 @@ class TestTestMsgCog:
 
         should_process_second = testmsg_cog.deduplicator.should_process(envelope2)
         assert not should_process_second
+
+
+class TestFormatNodeName:
+    def test_format_node_name_no_node_info(self):
+        result = TestMsg.format_node_name(123456789, None)
+        assert result == "**123456789**"
+
+    def test_format_node_name_empty_node_info(self):
+        result = TestMsg.format_node_name(123456789, {})
+        assert result == "**123456789**"
+
+    def test_format_node_name_with_short_and_long(self):
+        node_info = {"short_name": "ABC", "long_name": "Station ABC"}
+        result = TestMsg.format_node_name(123456789, node_info)
+        assert result == "**ABC** - Station ABC"
+
+    def test_format_node_name_with_short_only(self):
+        node_info = {"short_name": "ABC"}
+        result = TestMsg.format_node_name(123456789, node_info)
+        assert result == "**123456789**"
+
+    def test_format_node_name_with_long_only(self):
+        node_info = {"long_name": "Station ABC"}
+        result = TestMsg.format_node_name(123456789, node_info)
+        assert result == "**123456789**"
+
+    def test_format_node_name_with_empty_strings(self):
+        node_info = {"short_name": "", "long_name": ""}
+        result = TestMsg.format_node_name(123456789, node_info)
+        assert result == "**123456789**"
+
+    def test_format_node_name_with_none_values(self):
+        node_info = {"short_name": None, "long_name": None}
+        result = TestMsg.format_node_name(123456789, node_info)
+        assert result == "**123456789**"

@@ -2,6 +2,7 @@ import os
 import re
 from datetime import datetime
 from functools import partial
+from typing import Optional
 
 import aiomqtt
 from aiocache import SimpleMemoryCache
@@ -17,6 +18,7 @@ from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
+from bridger.utils import should_ignore_pki_message
 
 MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
@@ -43,7 +45,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         logger.info(f"TestMsg cog is ready and channel is: {self.discord_channel}")
 
     @staticmethod
-    def format_node_name(node_id: int, node_info: dict = None) -> str:
+    def format_node_name(node_id: int, node_info: Optional[dict] = None) -> str:
         """Format a consistent node name based on available info"""
         if not node_info:
             return f"**{node_id}**"
@@ -71,14 +73,17 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
         embed = Embed(color=color)
         # Try to get node info for the gateway hex ID
+        gateway_id = None
+        node_info = None
+
         try:
             gateway_id = int(gateway.strip("!"), 16)
             node_info = self.influx_reader.get_node_info(gateway_id)
         except (ValueError, TypeError) as e:
             logger.error(f"Failed to parse gateway ID '{gateway}': {e}")
-            node_info = None
 
-        gateway_name = self.format_node_name(gateway_id if "gateway_id" in locals() else gateway, node_info)
+        node_id = gateway_id if gateway_id is not None else int(gateway, 16)
+        gateway_name = self.format_node_name(node_id, node_info)
         embed.description = f"Heard by {gateway_name} - `{gateway}` at {formatted_time}"
         embed.add_field(name="SNR", value=snr, inline=True)
         embed.add_field(name="RSSI", value=rssi, inline=True)
@@ -112,7 +117,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         logger.info(f"Attempting to connect to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
         async with aiomqtt.Client(
             MQTT_BROKER,
-            MQTT_PORT,
+            int(MQTT_PORT),
             username=MQTT_USER,
             password=MQTT_PASS,
             clean_session=True,
@@ -121,9 +126,16 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             logger.info(f"Subscribed to {full_topic}")
             await logger.complete()
 
-            async for message in client.messages:
+            async for mqtt_message in client.messages:
+                # Ignoring PKI messages for now as we cannot decrypt them without storing keys somewhere
+                if should_ignore_pki_message(str(mqtt_message.topic)):
+                    logger.bind(topic=topic, channel=channel, *mqtt_message.properties).debug(
+                        f"Ignoring PKI message on topic {mqtt_message.topic}"
+                    )  # noqa: E501
+                    continue
+
                 try:
-                    service_envelope = ServiceEnvelope.FromString(message.payload)
+                    service_envelope = ServiceEnvelope.FromString(mqtt_message.payload)
                 except Exception:
                     logger.exception("Failed to decode MQTT message")
                     continue

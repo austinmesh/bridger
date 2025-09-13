@@ -11,6 +11,7 @@ from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
+from bridger.utils import should_ignore_pki_message
 
 
 class BridgerMQTT(Client):
@@ -45,9 +46,8 @@ class BridgerMQTT(Client):
         add_breadcrumb(level="info", data=breadcrumb_data, category="mqtt", message="Received message")
 
         # Ignoring PKI messages for now as we cannot decrypt them without storing keys somewhere
-        pki_topic = MQTT_TOPIC.removesuffix("/#") + "/PKI/"
-        if message.topic.startswith(pki_topic):
-            logger.bind(**breadcrumb_data).debug("Ignoring PKI message")
+        if should_ignore_pki_message(message.topic):
+            logger.bind(**breadcrumb_data).debug(f"Ignoring PKI message on topic {message.topic}")
             return
 
         try:
