@@ -58,7 +58,7 @@
           },
           "direction": "backward",
           "editorMode": "builder",
-          "expr": "{job=\"bridger\"} |= `` | json | label_format level=record_level_name",
+          "expr": "{job=\"bridger\"} | json | label_format level=record_level_name",
           "queryType": "range",
           "refId": "A"
         }

@@ -19,7 +19,7 @@ loki.relabel "journal_labels" {
 
 loki.source.journal "bridger_services" {
   matches = "SYSLOG_IDENTIFIER=bridger-*"
-  forward_to = [loki.write.bridger_parsing.receiver]
+  forward_to = [loki.process.bridger_parsing.receiver]
   relabel_rules = loki.relabel.journal_labels.rules
 
   labels = {
