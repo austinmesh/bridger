@@ -129,7 +129,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             async for mqtt_message in client.messages:
                 # Ignoring PKI messages for now as we cannot decrypt them without storing keys somewhere
                 if should_ignore_pki_message(str(mqtt_message.topic)):
-                    logger.bind(topic=topic, channel=channel, *mqtt_message.properties).debug(
+                    logger.bind(topic=topic, channel=channel).debug(
                         f"Ignoring PKI message on topic {mqtt_message.topic}"
                     )  # noqa: E501
                     continue
