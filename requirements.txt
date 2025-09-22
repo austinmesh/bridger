@@ -89,7 +89,7 @@ protobuf==6.32.1
     # via
     #   bridger (pyproject.toml)
     #   meshtastic
-pycparser==2.22
+pycparser==2.23
     # via cffi
 pygments==2.19.2
     # via
