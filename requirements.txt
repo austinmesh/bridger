@@ -115,7 +115,7 @@ python-dateutil==2.9.0.post0
     # via influxdb-client
 python-dotenv==1.1.1
     # via bridger (pyproject.toml)
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via meshtastic
 reactivex==4.0.4
     # via influxdb-client
