@@ -126,7 +126,7 @@ requests==2.32.5
     #   requests-mock
 requests-mock==1.12.1
     # via bridger (pyproject.toml)
-rich==14.1.0
+rich==14.2.0
     # via bridger (pyproject.toml)
 sentry-sdk==2.41.0
     # via bridger (pyproject.toml)
