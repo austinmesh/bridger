@@ -17,7 +17,7 @@ aiomqtt==2.4.0
     # via bridger (pyproject.toml)
 aiosignal==1.4.0
     # via aiohttp
-attrs==25.3.0
+attrs==25.4.0
     # via aiohttp
 bleak==0.22.3
     # via meshtastic
