@@ -81,7 +81,7 @@ pluggy==1.6.0
     # via
     #   pytest
     #   pytest-cov
-propcache==0.4.0
+propcache==0.4.1
     # via
     #   aiohttp
     #   yarl
