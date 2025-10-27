@@ -113,7 +113,7 @@ pytest-cov==7.0.0
     # via bridger (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via influxdb-client
-python-dotenv==1.1.1
+python-dotenv==1.2.1
     # via bridger (pyproject.toml)
 pyyaml==6.0.3
     # via meshtastic
