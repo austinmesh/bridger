@@ -36,7 +36,7 @@ cryptography==46.0.3
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
-dbus-fast==2.45.1
+dbus-fast==3.1.2
     # via bleak
 discord-py==2.6.4
     # via bridger (pyproject.toml)
