@@ -60,7 +60,7 @@ marshmallow==3.26.1
     # via dataclasses-json
 mdurl==0.1.2
     # via markdown-it-py
-meshtastic==2.7.3
+meshtastic==2.7.5
     # via bridger (pyproject.toml)
 multidict==6.7.0
     # via
