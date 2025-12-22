@@ -56,7 +56,7 @@ loguru==0.7.3
     # via bridger (pyproject.toml)
 markdown-it-py==4.0.0
     # via rich
-marshmallow==3.26.1
+marshmallow==3.26.2
     # via dataclasses-json
 mdurl==0.1.2
     # via markdown-it-py
