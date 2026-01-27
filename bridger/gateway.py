@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import secrets
@@ -152,3 +153,85 @@ class GatewayManagerEMQX:
             raise ValueError("Failed to reset password")
 
         return gateway, password
+
+
+def create_user_command(args):
+    # Create a simple user object with just the id attribute
+    class SimpleUser:
+        def __init__(self, user_id: int):
+            self.id = user_id
+
+    user = SimpleUser(int(args.user_id))
+    manager = GatewayManagerEMQX(emqx)
+
+    try:
+        gateway, password = manager.create_gateway_user(args.gateway_id, user)
+        print("Gateway user created successfully!")
+        print(f"Username: {gateway.user_string}")
+        print(f"Password: {password}")
+    except Exception as e:
+        print(f"Error creating gateway user: {e}")
+        exit(1)
+
+
+def delete_user_command(args):
+    manager = GatewayManagerEMQX(emqx)
+
+    try:
+        success = manager.delete_gateway_user(args.gateway_id)
+        if success:
+            print("Gateway user deleted successfully!")
+        else:
+            print("Failed to delete gateway user")
+            exit(1)
+    except Exception as e:
+        print(f"Error deleting gateway user: {e}")
+        exit(1)
+
+
+def list_users_command(args):
+    manager = GatewayManagerEMQX(emqx)
+
+    try:
+        gateways = list(manager.list_gateways())
+        if not gateways:
+            print("No gateway users found")
+        else:
+            print("Gateway users:")
+            for gateway in gateways:
+                print(f"  {gateway.user_string} (Node ID: !{gateway.node_hex_id_without_bang})")
+    except Exception as e:
+        print(f"Error listing gateway users: {e}")
+        exit(1)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="MQTT gateway user management")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Create user command
+    create_parser = subparsers.add_parser("create-user", help="Create a new gateway user")
+    create_parser.add_argument("gateway_id", help="Gateway ID (8 character hex, with or without ! prefix)")
+    create_parser.add_argument("user_id", help="User ID (numeric)")
+    create_parser.set_defaults(func=create_user_command)
+
+    # Delete user command
+    delete_parser = subparsers.add_parser("delete-user", help="Delete a gateway user")
+    delete_parser.add_argument("gateway_id", help="Gateway ID (8 character hex, with or without ! prefix)")
+    delete_parser.set_defaults(func=delete_user_command)
+
+    # List users command
+    list_parser = subparsers.add_parser("list-users", help="List all gateway users")
+    list_parser.set_defaults(func=list_users_command)
+
+    args = parser.parse_args()
+
+    if args.command is None:
+        parser.print_help()
+        exit(1)
+
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
