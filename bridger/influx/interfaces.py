@@ -27,8 +27,7 @@ class InfluxReader:
         return None
 
     def get_node_info(self, node_id: int, range: str = "-6h") -> Union[dict, None]:
-        query = dedent(
-            f"""
+        query = dedent(f"""
             import "strings"
             import "contrib/bonitoo-io/hex"
 
@@ -44,16 +43,14 @@ class InfluxReader:
               |> group(columns: ["_from"])
               |> last(column: "_from")
               |> map(fn: (r) => ({{ r with user_id: "!" + hexify(str: r._from) }}))
-        """
-        )
+        """)
 
         record = self._extract_first_record(self.query_data(query))
         return record.values if record else None
 
     def get_all_node_ids(self, range: str = "-30d") -> list[dict]:
         """Get all unique node IDs with display names from the last 30 days for autocomplete."""
-        query = dedent(
-            f"""
+        query = dedent(f"""
             import "strings"
             import "contrib/bonitoo-io/hex"
 
@@ -71,8 +68,7 @@ class InfluxReader:
               |> map(fn: (r) => ({{ _value: hexify(str: r._from),
                                    name: r.short_name + " (" + hexify(str: r._from) + ") - " + r.long_name}}))
               |> sort(columns: ["_value"])
-        """
-        )
+        """)
 
         try:
             tables = self.query_data(query)
@@ -104,8 +100,7 @@ class InfluxReader:
 
     def get_recent_packets(self, gateway_id: str, range: str = "-1h"):
         """Get recent packets for a gateway within the specified time range."""
-        query = dedent(
-            f"""
+        query = dedent(f"""
             from(bucket: "{INFLUXDB_V2_BUCKET}")
               |> range(start: {range})
               |> filter(fn: (r) => r["gateway_id"] == "{gateway_id}")
@@ -113,8 +108,7 @@ class InfluxReader:
               |> keep(columns: ["_from", "_time", "_measurement"])
               |> group()
               |> sort(columns: ["_time"])
-        """
-        )
+        """)
 
         return self.query_data(query)
 
