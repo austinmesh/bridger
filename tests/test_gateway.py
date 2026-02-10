@@ -29,13 +29,21 @@ def gateway_manager(emqx_mock):
 
 # Test prepare_gateway_id
 def test_prepare_gateway_id():
-    gateway_id, gateway_id_without_bang, node_id = GatewayManagerEMQX.prepare_gateway_id("1a2b3c4d")
+    # Test Meshtastic 8-char ID
+    gateway_id, gateway_id_without_bang, node_type = GatewayManagerEMQX.prepare_gateway_id("1a2b3c4d")
     assert gateway_id == "!1a2b3c4d"
     assert gateway_id_without_bang == "1a2b3c4d"
-    assert node_id == int("1a2b3c4d", 16)
+    assert node_type == "meshtastic"
+
+    # Test MeshCore 64-char ID
+    meshcore_id = "55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+    gateway_id, gateway_id_without_bang, node_type = GatewayManagerEMQX.prepare_gateway_id(meshcore_id)
+    assert gateway_id == f"!{meshcore_id}"
+    assert gateway_id_without_bang == meshcore_id
+    assert node_type == "meshcore"
 
     with pytest.raises(ValueError):
-        GatewayManagerEMQX.prepare_gateway_id("123")  # Less than 8 chars
+        GatewayManagerEMQX.prepare_gateway_id("123")  # Not 8 or 64 chars
 
 
 # Test generate_password
@@ -51,7 +59,8 @@ def test_list_gateways(gateway_manager):
     assert len(gateways) == 1
     assert isinstance(gateways[0], GatewayData)
     assert gateways[0].owner_id == 1234567890
-    assert gateways[0].node_id == int("1a2b3c4d", 16)
+    assert gateways[0].node_hex_id == "1a2b3c4d"
+    assert gateways[0].node_type == "meshtastic"
 
 
 # Test create_gateway_user
@@ -130,53 +139,57 @@ def test_reset_gateway_password(gateway_manager, emqx_mock):
     emqx_mock.update_user_password.assert_called_once_with(gateway_manager.authentication_id, gateway.user_string, password)
 
 
-class TestGatewayDataNodeMixin:
-    """Test GatewayData's inherited NodeMixin functionality"""
+class TestGatewayDataProperties:
+    """Test GatewayData properties for both Meshtastic and MeshCore"""
 
-    def test_gateway_data_hex_id_with_bang_basic(self):
-        """Test GatewayData hex ID conversion from node_id"""
-        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
+    def test_gateway_data_meshtastic_hex_id(self):
+        """Test GatewayData hex ID properties for Meshtastic"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345, node_type="meshtastic")
         assert gateway.node_hex_id_with_bang == "!1a2b3c4d"
         assert gateway.node_hex_id_without_bang == "1a2b3c4d"
 
-    def test_gateway_data_node_id_property(self):
-        """Test GatewayData node_id property storage"""
-        gateway = GatewayData(node_id=439041101, owner_id=12345)
-        assert gateway.node_id == 439041101
-        assert gateway.node_id == int("1a2b3c4d", 16)
+    def test_gateway_data_meshcore_hex_id(self):
+        """Test GatewayData hex ID properties for MeshCore"""
+        meshcore_id = "55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+        gateway = GatewayData(node_hex_id=meshcore_id, owner_id=12345, node_type="meshcore")
+        assert gateway.node_hex_id_with_bang == f"!{meshcore_id}"
+        assert gateway.node_hex_id_without_bang == meshcore_id
 
-    def test_gateway_data_color_property(self):
-        """Test GatewayData color property extraction"""
-        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
-        assert gateway.color == "2b3c4d"  # Last 6 characters
+    def test_gateway_data_node_hex_id_property(self):
+        """Test GatewayData node_hex_id property storage"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345, node_type="meshtastic")
+        assert gateway.node_hex_id == "1a2b3c4d"
 
-    def test_gateway_data_user_string_property(self):
-        """Test GatewayData user_string property"""
-        gateway = GatewayData(node_id=int("1a2b3c4d", 16), owner_id=12345)
+    def test_gateway_data_user_string_property_meshtastic(self):
+        """Test GatewayData user_string property for Meshtastic"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345, node_type="meshtastic")
         assert gateway.user_string == "12345-1a2b3c4d"
 
-    def test_gateway_data_small_node_id(self):
-        """Test GatewayData with small node ID requiring zero padding"""
-        gateway = GatewayData(node_id=255, owner_id=12345)  # 0xff
-        assert gateway.node_hex_id_with_bang == "!000000ff"
-        assert gateway.node_hex_id_without_bang == "000000ff"
-        assert gateway.color == "0000ff"
+    def test_gateway_data_user_string_property_meshcore(self):
+        """Test GatewayData user_string property for MeshCore"""
+        meshcore_id = "55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+        gateway = GatewayData(node_hex_id=meshcore_id, owner_id=12345, node_type="meshcore")
+        assert gateway.user_string == f"12345-{meshcore_id}"
 
-    def test_gateway_data_large_node_id(self):
-        """Test GatewayData with large node ID"""
-        gateway = GatewayData(node_id=4294967295, owner_id=12345)  # 0xffffffff
-        assert gateway.node_hex_id_with_bang == "!ffffffff"
-        assert gateway.node_hex_id_without_bang == "ffffffff"
-        assert gateway.color == "ffffff"
+    def test_gateway_data_node_type_meshtastic(self):
+        """Test GatewayData node_type for Meshtastic"""
+        gateway = GatewayData(node_hex_id="1a2b3c4d", owner_id=12345, node_type="meshtastic")
+        assert gateway.node_type == "meshtastic"
+
+    def test_gateway_data_node_type_meshcore(self):
+        """Test GatewayData node_type for MeshCore"""
+        meshcore_id = "55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+        gateway = GatewayData(node_hex_id=meshcore_id, owner_id=12345, node_type="meshcore")
+        assert gateway.node_type == "meshcore"
 
 
 # Test create_gateway_rules_dict static method
 def test_create_gateway_rules_dict():
-    """Test the static method that creates MQTT authorization rules dictionary"""
+    """Test the static method that creates MQTT authorization rules for Meshtastic"""
     gateway_id = "!1a2b3c4d"
     username = "12345-1a2b3c4d"
 
-    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(gateway_id, username)
+    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(gateway_id, username, "meshtastic")
 
     expected_dict = {
         "rules": [{"action": "all", "topic": "fake/2/e/+/!1a2b3c4d", "permission": "allow"}],
@@ -186,16 +199,26 @@ def test_create_gateway_rules_dict():
     assert rules_dict == expected_dict
 
 
-def test_create_gateway_rules_dict_without_bang():
-    """Test create_gateway_rules_dict with gateway_id without leading !"""
-    gateway_id = "1a2b3c4d"
-    username = "12345-1a2b3c4d"
+def test_create_gateway_rules_dict_meshcore():
+    """Test create_gateway_rules_dict for MeshCore node"""
+    # Input has ! prefix but output topics should not
+    meshcore_id_with_bang = "!55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+    meshcore_id_clean = "55365953947D253D213D7AB36DF0BE29FFB7A758049F657A6B32E1D00D66087D"
+    username = f"12345-{meshcore_id_clean}"
 
-    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(gateway_id, username)
+    rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(meshcore_id_with_bang, username, "meshcore")
 
+    # MeshCore topics should NOT have the ! prefix
+    base_topic = f"fake/meshcore/{meshcore_id_clean}"
     expected_dict = {
-        "rules": [{"action": "all", "topic": "fake/2/e/+/1a2b3c4d", "permission": "allow"}],
-        "username": "12345-1a2b3c4d",
+        "rules": [
+            {"action": "all", "topic": f"{base_topic}/info", "permission": "allow"},
+            {"action": "all", "topic": f"{base_topic}/stats/core", "permission": "allow"},
+            {"action": "all", "topic": f"{base_topic}/stats/radio", "permission": "allow"},
+            {"action": "all", "topic": f"{base_topic}/stats/packets", "permission": "allow"},
+            {"action": "all", "topic": f"{base_topic}/packets", "permission": "allow"},
+        ],
+        "username": username,
     }
 
     assert rules_dict == expected_dict
