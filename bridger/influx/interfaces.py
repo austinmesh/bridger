@@ -1,14 +1,13 @@
 from dataclasses import fields
 from functools import lru_cache
 from textwrap import dedent
-from typing import Union
+from typing import Any, Union
 
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
 
 from bridger.config import INFLUXDB_V2_BUCKET, INFLUXDB_V2_WRITE_PRECISION
-from bridger.dataclasses import TelemetryPoint
 from bridger.log import logger
 
 
@@ -131,17 +130,28 @@ class InfluxWriter:
     def __init__(self, influx_client: InfluxDBClient):
         self.write_api = influx_client.write_api(write_options=SYNCHRONOUS)
 
-    def write_data(self, record, measurement, fields, tags):
+    def write_data(self, record, measurement, fields, tags, bucket: str = None):
+        """Write data to InfluxDB.
+
+        Args:
+            record: The data point(s) to write
+            measurement: The measurement name
+            fields: List of field keys
+            tags: List of tag keys
+            bucket: Optional bucket name (defaults to INFLUXDB_V2_BUCKET)
+        """
+        target_bucket = bucket or INFLUXDB_V2_BUCKET
         try:
             extra = {
                 "measurement": measurement,
                 "tags": tags,
                 "fields": fields,
                 "record": record,
+                "bucket": target_bucket,
             }
 
             self.write_api.write(
-                bucket=INFLUXDB_V2_BUCKET,
+                bucket=target_bucket,
                 record=record,
                 record_measurement_name=measurement,
                 record_field_keys=fields,
@@ -149,30 +159,46 @@ class InfluxWriter:
                 write_precision=INFLUXDB_V2_WRITE_PRECISION,
             )
 
+            # Log the write - handle both meshtastic (gateway_id) and meshcore (public_key) points
             if isinstance(record, list):
+                first_record = record[0]
+                identifier = getattr(first_record, "gateway_id", None) or getattr(first_record, "public_key", "unknown")
                 logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {len(record)} {measurement} packets from gateway: <green>{record[0].gateway_id}</green>"
+                    f"Wrote {len(record)} {measurement} points to {target_bucket}: <green>{identifier}</green>"
                 )
             else:
-                logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {measurement} packet <yellow>{record.packet_id}</yellow> from gateway: <green>{record.gateway_id}</green>"  # noqa: E501
-                )
+                identifier = getattr(record, "gateway_id", None) or getattr(record, "public_key", "unknown")
+                packet_id = getattr(record, "packet_id", None)
+                if packet_id:
+                    logger.bind(**extra).opt(colors=True).info(
+                        f"Wrote {measurement} packet <yellow>{packet_id}</yellow> to {target_bucket}: <green>{identifier}</green>"
+                    )
+                else:
+                    logger.bind(**extra).opt(colors=True).info(
+                        f"Wrote {measurement} point to {target_bucket}: <green>{identifier}</green>"
+                    )
         except ApiException as e:
             if e.status == 401:
                 logger.bind(**extra).error(f"Credentials for InfluxDB are either not set or incorrect: {e}")
             else:
                 logger.bind(**extra).error(f"Error writing to InfluxDB: {e}")
 
-    def write_point(self, telemetry_data: Union[TelemetryPoint, list[TelemetryPoint]]):
-        if not telemetry_data:
+    def write_point(self, data: Union[Any, list[Any]], bucket: str = None):
+        """Write data point(s) to InfluxDB.
+
+        Args:
+            data: The data point(s) to write (must have measurement_name and influx_kind metadata)
+            bucket: Optional bucket name (defaults to INFLUXDB_V2_BUCKET)
+        """
+        if not data:
             return
 
-        point_cls = type(telemetry_data[0]) if isinstance(telemetry_data, list) else type(telemetry_data)
+        point_cls = type(data[0]) if isinstance(data, list) else type(data)
         measurement = getattr(point_cls, "measurement_name", None)
         tag_keys, field_keys = self.extract_keys(point_cls)
 
         if measurement:
-            self.write_data(telemetry_data, measurement, field_keys, tag_keys)
+            self.write_data(data, measurement, field_keys, tag_keys, bucket=bucket)
 
     @staticmethod
     @lru_cache(maxsize=64)

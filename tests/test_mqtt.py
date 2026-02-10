@@ -32,7 +32,10 @@ class TestBridgerMQTT:
     def test_on_connect_success(self, mqtt_client):
         mqtt_client.subscribe = MagicMock(return_value=(0, 1))
         mqtt_client.on_connect(mqtt_client, None, None, 0, None)
-        mqtt_client.subscribe.assert_called_once_with("fake/2/e/#")
+        # Should subscribe to meshtastic topic
+        mqtt_client.subscribe.assert_any_call("fake/2/e/#")
+        # Should also subscribe to meshcore topic when MESHCORE_ENABLED=true (default)
+        mqtt_client.subscribe.assert_any_call("fake/meshcore/#")
 
     def test_on_connect_failure(self, mqtt_client):
         mqtt_client.subscribe = MagicMock()

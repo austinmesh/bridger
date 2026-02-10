@@ -25,6 +25,7 @@ dependencies = [
     "discord.py",
     "influxdb-client",
     "loguru",
+    "meshcoredecoder",
     "meshtastic",
     "paho-mqtt",
     "protobuf",
