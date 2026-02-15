@@ -1,0 +1,91 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=bridger"]
+  }
+}
+
+loki.relabel "docker_labels" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "service"
+    regex = "/(.*)"
+    replacement = "${1}"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_image"]
+    target_label  = "image"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "role"
+    regex = "/bridger-(.+)"
+    replacement = "${1}"
+  }
+}
+
+loki.source.docker "bridger_containers" {
+  host = "unix:///var/run/docker.sock"
+  targets = discovery.docker.containers.targets
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.docker_labels.rules
+
+  labels = { "job" = "bridger-docker" }
+}
+
+loki.process "bridger_parsing" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      record = "record",
+      text = "text",
+      message = "record.message",
+      timestamp = "record.time.timestamp",
+      extra = "record.extra",
+      exception = "record.exception",
+      level = "record.level.name",
+      module = "record.module",
+      function = "record.function",
+      file = "record.file",
+      line = "record.line",
+      name = "record.name",
+      process = "record.process",
+      thread = "record.thread",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

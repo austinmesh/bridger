@@ -1,0 +1,21 @@
+[Unit]
+StartLimitInterval = 200
+StartLimitBurst = 5
+
+[Container]
+Exec = run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /mnt/config/config-journal.alloy
+Image = docker.io/grafana/alloy:v1.10.2
+Network = bridger.network
+HostName = alloy
+PublishPort = 12345:12345
+SecurityLabelDisable = true
+Volume = %t/podman/podman.sock:/var/run/docker.sock:ro
+Volume = /home/andy/.config/bridger:/mnt/config
+Volume = alloy-data.volume:/var/lib/alloy
+
+[Install]
+WantedBy = default.target
+
+[Service]
+Restart = always
+RestartSec = 30
