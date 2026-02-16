@@ -48,7 +48,7 @@ idna==3.11
     # via
     #   requests
     #   yarl
-influxdb-client==1.49.0
+influxdb-client==1.50.0
     # via bridger (pyproject.toml)
 iniconfig==2.3.0
     # via pytest
