@@ -13,7 +13,7 @@ aiohttp==3.13.3
     #   bridger (pyproject.toml)
     #   discord-py
     #   pytest-aiohttp
-aiomqtt==2.4.0
+aiomqtt==2.5.0
     # via bridger (pyproject.toml)
 aiosignal==1.4.0
     # via aiohttp
