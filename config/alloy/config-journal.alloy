@@ -1,0 +1,68 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+loki.relabel "journal_labels" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "service"
+  }
+}
+
+loki.source.journal "bridger_services" {
+  matches = "SYSLOG_IDENTIFIER=bridger-*"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.process "bridger_parsing" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      record = "record",
+      text = "text",
+      message = "record.message",
+      timestamp = "record.time.timestamp",
+      extra = "record.extra",
+      exception = "record.exception",
+      level = "record.level.name",
+      module = "record.module",
+      function = "record.function",
+      file = "record.file",
+      line = "record.line",
+      name = "record.name",
+      process = "record.process",
+      thread = "record.thread",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://localhost:3100/loki/api/v1/push"
+  }
+}
