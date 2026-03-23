@@ -21,7 +21,7 @@ attrs==25.4.0
     # via aiohttp
 bleak==0.22.3
     # via meshtastic
-certifi==2026.1.4
+certifi==2026.2.25
     # via
     #   influxdb-client
     #   requests
