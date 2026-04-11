@@ -17,23 +17,13 @@ class MeshCoreProcessorError(Exception):
         self.data_type = data_type
 
 
-# Data type keys that can appear in the JSON payload
-DATA_TYPE_KEYS = ["stats_radio", "stats_packet", "stats_core", "raw"]
-
-# Mapping from JSON keys to handler data_type identifiers
-DATA_TYPE_MAP = {
-    "stats_radio": "stats/radio",
-    "stats_packet": "stats/packets",
-    "stats_core": "stats/core",
-    "raw": "packets",
-}
-
-
 @dataclass
 class MeshCoreMetadata:
-    """Common metadata from MeshCore JSON messages."""
+    """Common metadata from MeshCore messages."""
 
     public_key: str
+    iata: str
+    origin: Optional[str] = None
     name: Optional[str] = None
     ver: Optional[str] = None
     board: Optional[str] = None
@@ -42,17 +32,11 @@ class MeshCoreMetadata:
 class MCPacketProcessor:
     """Processor for MeshCore MQTT messages.
 
-    All messages are JSON with common metadata fields:
-        - name: Device name
-        - public_key: Device public key
-        - ver: Firmware version
-        - board: Hardware board type
+    Topic format: meshcore/{IATA}/{PUBLIC_KEY}/{packets|status}
 
-    And one data-specific field:
-        - stats_radio: Radio statistics
-        - stats_packets: Packet statistics
-        - stats_core: Core statistics
-        - raw: Raw packet data (hex string)
+    Message types:
+        - packets: Raw mesh packet data with envelope metadata (SNR, RSSI, etc.)
+        - status: Observer/gateway health status with device stats
     """
 
     # Extract the base prefix from config (remove the wildcard)
@@ -64,10 +48,31 @@ class MCPacketProcessor:
         self._parsed_json: Optional[dict] = None
         self._metadata: Optional[MeshCoreMetadata] = None
         self._data_type: Optional[str] = None
+        self._iata: Optional[str] = None
+        self._public_key: Optional[str] = None
+        self._parse_topic()
         self._parse_payload()
 
+    def _parse_topic(self):
+        """Parse topic to extract iata, public_key, data_type.
+
+        Topic format: {prefix}{IATA}/{PUBLIC_KEY}/{packets|status}
+        """
+        relative = self.topic[len(self.TOPIC_PREFIX) :]
+        parts = relative.split("/")
+
+        if len(parts) != 3:
+            raise MeshCoreProcessorError(f"Invalid topic structure: {self.topic}")
+
+        self._iata = parts[0]
+        self._public_key = parts[1]
+        self._data_type = parts[2]
+
+        if self._data_type not in ("packets", "status"):
+            raise MeshCoreProcessorError(f"Unknown data type from topic: {self._data_type}")
+
     def _parse_payload(self):
-        """Parse the JSON payload and extract metadata and data type."""
+        """Parse the JSON payload and extract metadata."""
         try:
             self._parsed_json = json.loads(self.raw_payload.decode("utf-8"))
         except json.JSONDecodeError as e:
@@ -76,83 +81,107 @@ class MCPacketProcessor:
         if not isinstance(self._parsed_json, dict):
             raise MeshCoreProcessorError("Payload must be a JSON object")
 
-        # Extract common metadata
-        public_key = self._parsed_json.get("public_key")
-        if not public_key:
-            raise MeshCoreProcessorError("Missing required field: public_key")
-
+        # Build metadata from topic path + JSON fields
         self._metadata = MeshCoreMetadata(
-            public_key=public_key,
-            name=self._parsed_json.get("name"),
-            ver=self._parsed_json.get("ver"),
-            board=self._parsed_json.get("board"),
+            public_key=self._public_key,
+            iata=self._iata,
+            origin=self._parsed_json.get("origin"),
         )
 
-        # Detect data type from present keys (optional - info messages won't have one)
-        for key in DATA_TYPE_KEYS:
-            if key in self._parsed_json:
-                self._data_type = DATA_TYPE_MAP[key]
-                break
+        # Status messages include device info
+        if self._data_type == "status":
+            self._metadata.ver = self._parsed_json.get("firmware_version")
+            self._metadata.board = self._parsed_json.get("model")
+
+    def _is_heartbeat_packet(self) -> bool:
+        """Check if this is a keepalive packet with no real data."""
+        if self._data_type != "packets":
+            return False
+        raw = self._parsed_json.get("raw", "")
+        pkt_len = self._parsed_json.get("len", "0")
+        return not raw.strip() or pkt_len == "0"
+
+    @staticmethod
+    def _safe_float(value: str) -> Optional[float]:
+        """Parse a string to float, returning None on failure."""
+        if not value:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _safe_int(value: str) -> Optional[int]:
+        """Parse a string to int, returning None on failure."""
+        if not value:
+            return None
+        try:
+            return int(float(value))
+        except (ValueError, TypeError):
+            return None
 
     @property
     def public_key(self) -> str:
-        """Return the device public key."""
-        return self._metadata.public_key
+        return self._public_key
 
     @property
     def metadata(self) -> MeshCoreMetadata:
-        """Return the common metadata."""
         return self._metadata
 
     @property
     def data_type(self) -> Optional[str]:
-        """Return the detected data type, or None for info-only messages."""
         return self._data_type
 
     @property
     def payload(self) -> Union[str, dict]:
-        """Return the data-specific payload.
+        """Return the processed payload for handlers.
 
         Returns:
-            - For "packets" (raw): Decoded dict from meshcoredecoder
-            - For "stats/*": Parsed dict from JSON
+            - For "packets": decoded dict from meshcoredecoder with envelope metadata
+            - For "status": the full parsed JSON dict
         """
         if self._data_type == "packets":
-            # Get the raw hex string and decode it
             hex_str = self._parsed_json.get("raw", "")
-            if not hex_str:
+            if not hex_str.strip():
                 return {"error": "Empty raw packet data"}
+
+            # Build envelope metadata from the relay's JSON fields
+            envelope = {
+                "SNR": self._safe_float(self._parsed_json.get("SNR", "")),
+                "RSSI": self._safe_int(self._parsed_json.get("RSSI", "")),
+                "direction": self._parsed_json.get("direction"),
+                "route": self._parsed_json.get("route"),
+                "hash": self._parsed_json.get("hash"),
+                "path": self._parsed_json.get("path"),
+            }
 
             try:
                 from meshcoredecoder import MeshCoreDecoder
 
                 decoded = MeshCoreDecoder.decode(hex_str)
-                # Convert DecodedPacket to dict for handler processing
                 decoded_dict = decoded.to_dict() if hasattr(decoded, "to_dict") else vars(decoded)
+                decoded_dict["envelope"] = envelope
                 logger.debug(f"Decoded MeshCore packet: {decoded_dict}")
                 return decoded_dict
             except ImportError:
                 logger.warning("meshcoredecoder not installed, returning raw hex string")
-                return {"raw": hex_str}
+                return {"raw": hex_str, "envelope": envelope}
             except Exception as e:
                 logger.warning(f"Failed to decode MeshCore packet: {e}")
-                return {"error": str(e), "raw": hex_str}
+                return {"error": str(e), "raw": hex_str, "envelope": envelope}
 
-        elif self._data_type == "stats/radio":
-            return self._parsed_json.get("stats_radio", {})
-        elif self._data_type == "stats/packets":
-            return self._parsed_json.get("stats_packet", {})
-        elif self._data_type == "stats/core":
-            return self._parsed_json.get("stats_core", {})
+        elif self._data_type == "status":
+            return self._parsed_json
 
         return {}
 
     @property
     def data(self) -> Union[None, Any, list[Any]]:
         """Process and return data point(s) for InfluxDB."""
-        # Info-only messages don't have a data type key
-        if not self._data_type:
-            logger.debug("Info-only message, no data to process")
+        # Skip heartbeat/keepalive packets
+        if self._is_heartbeat_packet():
+            logger.debug("Skipping heartbeat/keepalive packet (empty raw data)")
             return None
 
         handlers = MESHCORE_HANDLER_MAP.get(self._data_type, [])

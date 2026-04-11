@@ -208,15 +208,12 @@ def test_create_gateway_rules_dict_meshcore():
 
     rules_dict = GatewayManagerEMQX.create_gateway_rules_dict(meshcore_id_with_bang, username, "meshcore")
 
-    # MeshCore topics should NOT have the ! prefix
-    base_topic = f"fake/meshcore/{meshcore_id_clean}"
+    # MeshCore topics: meshcore/{IATA}/{PUBLIC_KEY}/{packets|status}
+    base_topic = f"fake/meshcore/AUS/{meshcore_id_clean}"
     expected_dict = {
         "rules": [
-            {"action": "all", "topic": f"{base_topic}/info", "permission": "allow"},
-            {"action": "all", "topic": f"{base_topic}/stats/core", "permission": "allow"},
-            {"action": "all", "topic": f"{base_topic}/stats/radio", "permission": "allow"},
-            {"action": "all", "topic": f"{base_topic}/stats/packets", "permission": "allow"},
             {"action": "all", "topic": f"{base_topic}/packets", "permission": "allow"},
+            {"action": "all", "topic": f"{base_topic}/status", "permission": "allow"},
         ],
         "username": username,
     }
