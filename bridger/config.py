@@ -11,6 +11,7 @@ MESHTASTIC_API_ENDPOINT = "https://api.meshtastic.org"
 MESHTASTIC_API_CACHE_TTL = int(os.getenv("MESHTASTIC_API_CACHE_TTL", 3600 * 6))  # Default to 6 hours if not set
 
 # MeshCore configuration
-MESHCORE_MQTT_TOPIC = os.getenv("MESHCORE_MQTT_TOPIC", "egr/home/meshcore/#")
+MESHCORE_IATA = os.getenv("MESHCORE_IATA", "AUS")
+MESHCORE_MQTT_TOPIC = os.getenv("MESHCORE_MQTT_TOPIC", "meshcore/#")
 MESHCORE_INFLUXDB_BUCKET = os.getenv("MESHCORE_INFLUXDB_BUCKET", "meshcore")
 MESHCORE_ENABLED = os.getenv("MESHCORE_ENABLED", "true").lower() == "true"

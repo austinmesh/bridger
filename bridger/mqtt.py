@@ -111,7 +111,13 @@ class BridgerMQTT(Client):
 
             if data:
                 influx_writer = InfluxWriter(self.influx_client)
-                influx_writer.write_point(data, bucket=MESHCORE_INFLUXDB_BUCKET)
+                # Status messages return a list of different point types (different measurements),
+                # so write each individually. Packet messages return a single point.
+                if isinstance(data, list):
+                    for point in data:
+                        influx_writer.write_point(point, bucket=MESHCORE_INFLUXDB_BUCKET)
+                else:
+                    influx_writer.write_point(data, bucket=MESHCORE_INFLUXDB_BUCKET)
                 logger.bind(**breadcrumb_data).info(f"Wrote MeshCore data: {data}")
             else:
                 logger.bind(**breadcrumb_data).info(f"No MeshCore data to write for data_type: {processor.data_type}")

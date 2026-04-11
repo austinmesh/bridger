@@ -8,7 +8,7 @@ from typing import Generator, Union
 from discord import Member, User
 from requests import HTTPError
 
-from bridger.config import MESHCORE_MQTT_TOPIC, MQTT_TOPIC
+from bridger.config import MESHCORE_IATA, MESHCORE_MQTT_TOPIC, MQTT_TOPIC
 from bridger.emqx import EMQXClient
 from bridger.log import logger
 
@@ -130,26 +130,20 @@ class GatewayManagerEMQX:
 
         Meshtastic topics: {base_topic}/+/{gateway_id} (with ! prefix)
         MeshCore topics (no ! prefix):
-            - {base_topic}/info
-            - {base_topic}/stats/core
-            - {base_topic}/stats/radio
-            - {base_topic}/stats/packets
-            - {base_topic}/packets
+            - meshcore/{IATA}/{PUBLIC_KEY}/packets
+            - meshcore/{IATA}/{PUBLIC_KEY}/status
         """
         if node_type == "meshtastic":
             topic_prefix = MQTT_TOPIC.removesuffix("/#")
             mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/+/{gateway_id}", "permission": "allow"}]
         elif node_type == "meshcore":
             topic_prefix = MESHCORE_MQTT_TOPIC.removesuffix("/#")
-            # MeshCore topics don't use the ! prefix
+            # MeshCore topics: meshcore/{IATA}/{PUBLIC_KEY}/{packets|status}
             gateway_id_clean = gateway_id.lstrip("!")
-            base_topic = f"{topic_prefix}/{gateway_id_clean}"
+            base_topic = f"{topic_prefix}/{MESHCORE_IATA}/{gateway_id_clean}"
             mqtt_rules = [
-                {"action": "all", "topic": f"{base_topic}/info", "permission": "allow"},
-                {"action": "all", "topic": f"{base_topic}/stats/core", "permission": "allow"},
-                {"action": "all", "topic": f"{base_topic}/stats/radio", "permission": "allow"},
-                {"action": "all", "topic": f"{base_topic}/stats/packets", "permission": "allow"},
                 {"action": "all", "topic": f"{base_topic}/packets", "permission": "allow"},
+                {"action": "all", "topic": f"{base_topic}/status", "permission": "allow"},
             ]
         else:
             raise ValueError(f"Unknown node type: {node_type}")

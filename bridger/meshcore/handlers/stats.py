@@ -1,68 +1,73 @@
-"""Handlers for MeshCore stats messages (JSON data)."""
+"""Handler for MeshCore status messages (observer/gateway health)."""
 
-from bridger.dataclasses import MeshCoreStatsCorePoint, MeshCoreStatsPacketsPoint, MeshCoreStatsRadioPoint
+from bridger.dataclasses import MeshCoreStatsCorePoint, MeshCoreStatsRadioPoint, MeshCoreStatusPoint
 from bridger.meshcore.base import MeshCoreHandler
 from bridger.meshcore.handler_registry import meshcore_handler
 
 
-@meshcore_handler("stats/core")
-class StatsCoreHandler(MeshCoreHandler):
-    """Handler for core stats (battery, uptime, errors, queue_len)."""
+@meshcore_handler("status")
+class StatusHandler(MeshCoreHandler):
+    """Handler for observer/gateway status messages.
+
+    Status messages contain:
+        - Online/offline status
+        - Device info (firmware, model, radio config)
+        - Stats: battery, uptime, noise floor, air time, etc.
+
+    Produces multiple data points per message to maintain
+    separate InfluxDB measurements for core and radio stats.
+    """
 
     def handle(self):
         if not isinstance(self.payload, dict):
             return None
 
-        return MeshCoreStatsCorePoint(
+        stats = self.payload.get("stats", {})
+        points = []
+
+        # Observer core stats
+        core_point = MeshCoreStatsCorePoint(
             public_key=self.public_key,
+            iata=self.iata,
+            origin=self.origin,
             name=self.metadata.name,
             ver=self.metadata.ver,
             board=self.metadata.board,
-            battery_mv=self.payload.get("battery_mv"),
-            uptime_secs=self.payload.get("uptime_secs"),
-            errors=self.payload.get("errors"),
-            queue_len=self.payload.get("queue_len"),
+            battery_mv=stats.get("battery_mv"),
+            uptime_secs=stats.get("uptime_secs"),
+            queue_len=stats.get("queue_len"),
+            debug_flags=stats.get("debug_flags"),
+            recv_errors=stats.get("recv_errors"),
         )
+        points.append(core_point)
 
-
-@meshcore_handler("stats/radio")
-class StatsRadioHandler(MeshCoreHandler):
-    """Handler for radio stats (noise_floor, rssi, snr, air time)."""
-
-    def handle(self):
-        if not isinstance(self.payload, dict):
-            return None
-
-        return MeshCoreStatsRadioPoint(
+        # Observer radio stats
+        radio_point = MeshCoreStatsRadioPoint(
             public_key=self.public_key,
+            iata=self.iata,
+            origin=self.origin,
             name=self.metadata.name,
             ver=self.metadata.ver,
             board=self.metadata.board,
-            noise_floor=self.payload.get("noise_floor"),
-            last_rssi=self.payload.get("last_rssi"),
-            last_snr=self.payload.get("last_snr"),
-            tx_air_secs=self.payload.get("tx_air_secs"),
-            rx_air_secs=self.payload.get("rx_air_secs"),
+            noise_floor=stats.get("noise_floor"),
+            tx_air_secs=stats.get("tx_air_secs"),
+            rx_air_secs=stats.get("rx_air_secs"),
         )
+        points.append(radio_point)
 
-
-@meshcore_handler("stats/packets")
-class StatsPacketsHandler(MeshCoreHandler):
-    """Handler for packet stats (recv, sent, flood/direct counts)."""
-
-    def handle(self):
-        if not isinstance(self.payload, dict):
-            return None
-
-        return MeshCoreStatsPacketsPoint(
+        # Observer online/offline status
+        status_point = MeshCoreStatusPoint(
             public_key=self.public_key,
+            iata=self.iata,
+            origin=self.origin,
             name=self.metadata.name,
             ver=self.metadata.ver,
             board=self.metadata.board,
-            recv=self.payload.get("recv"),
-            sent=self.payload.get("sent"),
-            flood_tx=self.payload.get("flood_tx"),
-            direct_tx=self.payload.get("direct_tx"),
-            flood_rx=self.payload.get("flood_rx"),
-            direct_rx=self.payload.get("direct_rx"),
+            status=self.payload.get("status"),
+            source=self.payload.get("source"),
+            client_version=self.payload.get("client_version"),
+            radio=self.payload.get("radio"),
         )
+        points.append(status_point)
+
+        return points

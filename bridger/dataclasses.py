@@ -170,6 +170,8 @@ class MeshCorePoint(ABC):
             raise TypeError("Cannot instantiate abstract class MeshCorePoint.")
 
     public_key: str = field(metadata={"influx_kind": "tag"})
+    iata: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    origin: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
     name: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
     ver: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
     board: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
@@ -177,19 +179,21 @@ class MeshCorePoint(ABC):
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class MeshCoreInfoPoint(MeshCorePoint):
-    """Device info data (version, board, public key, etc.)."""
+class MeshCoreStatusPoint(MeshCorePoint):
+    """Observer/gateway online status."""
 
-    measurement_name = "mc_info"
+    measurement_name = "mc_status"
 
-    info_type: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
-    value: Optional[str] = field(default=None, metadata={"influx_kind": "field"})
+    status: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    source: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    client_version: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    radio: Optional[str] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class MeshCoreStatsCorePoint(MeshCorePoint):
-    """Core stats (battery, uptime, errors, queue_len)."""
+    """Observer core stats (battery, uptime, errors, queue_len)."""
 
     measurement_name = "mc_stats_core"
 
@@ -197,12 +201,14 @@ class MeshCoreStatsCorePoint(MeshCorePoint):
     uptime_secs: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     errors: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     queue_len: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    debug_flags: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    recv_errors: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class MeshCoreStatsRadioPoint(MeshCorePoint):
-    """Radio stats (noise_floor, rssi, snr, air time)."""
+    """Observer radio stats (noise_floor, air time)."""
 
     measurement_name = "mc_stats_radio"
 
@@ -215,23 +221,8 @@ class MeshCoreStatsRadioPoint(MeshCorePoint):
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class MeshCoreStatsPacketsPoint(MeshCorePoint):
-    """Packet stats (recv, sent, flood/direct counts)."""
-
-    measurement_name = "mc_stats_packets"
-
-    recv: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    sent: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    flood_tx: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    direct_tx: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    flood_rx: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    direct_rx: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-
-
-@dataclass_json(undefined=Undefined.EXCLUDE)
-@dataclass
 class MeshCorePacketPoint(MeshCorePoint):
-    """Base class for decoded packet metadata (from meshcoredecoder).
+    """Decoded packet metadata (from meshcoredecoder).
 
     Used as fallback for unknown payload types or types without specific handlers.
     """
@@ -245,6 +236,12 @@ class MeshCorePacketPoint(MeshCorePoint):
     path_length: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     total_bytes: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     is_valid: Optional[bool] = field(default=None, metadata={"influx_kind": "field"})
+
+    # Envelope metadata from the observer relay
+    snr: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    rssi: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    direction: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    mqtt_hash: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
@@ -277,6 +274,12 @@ class MeshCoreAdvertPoint(MeshCorePoint):
     latitude: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
     longitude: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
 
+    # Envelope metadata from the observer relay
+    snr: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    rssi: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    direction: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    mqtt_hash: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
@@ -302,3 +305,9 @@ class MeshCoreTracePoint(MeshCorePoint):
     flags: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     # Store path_hashes as comma-separated string since InfluxDB doesn't support lists
     path_hashes: Optional[str] = field(default=None, metadata={"influx_kind": "field"})
+
+    # Envelope metadata from the observer relay
+    snr: Optional[float] = field(default=None, metadata={"influx_kind": "field"})
+    rssi: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    direction: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})
+    mqtt_hash: Optional[str] = field(default=None, metadata={"influx_kind": "tag"})

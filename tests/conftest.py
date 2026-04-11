@@ -25,3 +25,14 @@ def patch_meshcore_mqtt_topic(monkeypatch):
     for module_name, module in sys.modules.items():
         if module_name.startswith("bridger.") and hasattr(module, "MESHCORE_MQTT_TOPIC"):
             monkeypatch.setattr(f"{module_name}.MESHCORE_MQTT_TOPIC", test_topic)
+
+
+@pytest.fixture(autouse=True)
+def patch_meshcore_iata(monkeypatch):
+    test_iata = "AUS"
+    monkeypatch.setenv("MESHCORE_IATA", test_iata)
+    monkeypatch.setattr("bridger.config.MESHCORE_IATA", test_iata)
+
+    for module_name, module in sys.modules.items():
+        if module_name.startswith("bridger.") and hasattr(module, "MESHCORE_IATA"):
+            monkeypatch.setattr(f"{module_name}.MESHCORE_IATA", test_iata)

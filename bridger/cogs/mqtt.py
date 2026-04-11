@@ -233,10 +233,11 @@ class GatewayPaginationView(ui.View):
         for gateway in page_gateways:
             owner = self.bot.get_user(gateway.owner_id)
             owner_name = owner.name if owner else "Unknown"
+            node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
 
             embed.add_field(
                 name="Gateway",
-                value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                value=f"ID: **{gateway.node_hex_id_without_bang}**\nType: **{node_type_label}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                 inline=False,
             )
 
@@ -300,11 +301,15 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             )
 
     @app_commands.check(check_valid_node_id)
-    @app_commands.command(name="request-account", description="Request a new MQTT account")
-    @app_commands.describe(node_id="The hex node ID: 8-char Meshtastic (e.g. cbaf0421) or 64-char MeshCore public key")
+    @app_commands.command(name="request-account", description="Request a new MQTT gateway account")
+    @app_commands.describe(node_id="Meshtastic node ID (8-char hex, e.g. cbaf0421) or MeshCore public key (64-char hex)")
     async def request_account(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
-        message = f"Gateway created for node **{gateway.node_hex_id_without_bang}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
+        node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
+        message = (
+            f"{node_type_label} gateway created for node **{gateway.node_hex_id_without_bang}**\n\n"
+            f"Username: **{gateway.user_string}**\nPassword: **{password}**"
+        )
 
         await ctx.response.send_message(message, ephemeral=True)
 
@@ -349,10 +354,11 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             for gateway in gateways:
                 owner = self.bot.get_user(gateway.owner_id)
                 owner_name = owner.name if owner else "Unknown"
+                node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
 
                 embed.add_field(
                     name="Gateway",
-                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nType: **{node_type_label}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                     inline=False,
                 )
 
