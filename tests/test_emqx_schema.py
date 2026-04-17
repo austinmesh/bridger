@@ -89,13 +89,13 @@ def test_authorization_rule_valid():
 
 def test_authorization_rule_invalid_permission():
     with pytest.raises(ValueError):
-        AuthorizationRule(topic="my/topic", permission="invalid")
+        AuthorizationRule(topic="my/topic", permission="invalid")  # type: ignore[arg-type]
 
 
 # Testing AuthorizationUsersRules
 def test_authorization_users_rules():
     rules = [{"topic": "my/topic", "permission": "allow", "action": "publish", "qos": [0]}]
-    auth_user_rules = AuthorizationUsersRules(username="user1", rules=rules)
+    auth_user_rules = AuthorizationUsersRules(username="user1", rules=rules)  # type: ignore[arg-type]
     assert auth_user_rules.username == "user1"
     assert len(auth_user_rules.rules) == 1
     assert auth_user_rules.rules[0].topic == "my/topic"
@@ -122,8 +122,9 @@ def test_public_meta():
 def test_response_users():
     users = [{"user_id": "user1"}, {"user_id": "user2"}]
     meta = {"hasnext": True, "limit": 100, "count": 10, "page": 1}
-    response_users = ResponseUsers(users=users, meta=meta)
+    response_users = ResponseUsers(users=users, meta=meta)  # type: ignore[arg-type]
 
     assert len(response_users.users) == 2
     assert response_users.users[0].user_id == "user1"
+    assert isinstance(response_users.meta, PublicMeta)
     assert response_users.meta.limit == 100

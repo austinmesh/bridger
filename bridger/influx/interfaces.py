@@ -3,7 +3,7 @@ from functools import lru_cache
 from textwrap import dedent
 from typing import Union
 
-from influxdb_client import InfluxDBClient
+from influxdb_client.client.influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
 
@@ -116,13 +116,14 @@ class InfluxReader:
     def _extract_first_record(table_list):
         if not table_list:
             return None
+        table = None
         try:
             table = table_list[0]
             if not table.records:
                 return None
             return table.records[0]
         except Exception as e:
-            extra = {k: locals()[k] for k in ("table_list", "table")}
+            extra = {"table_list": table_list, "table": table}
             logger.bind(**extra).error(f"Error processing query result: {e}")
             return None
 
@@ -132,21 +133,21 @@ class InfluxWriter:
         self.write_api = influx_client.write_api(write_options=SYNCHRONOUS)
 
     def write_data(self, record, measurement, fields, tags):
-        try:
-            extra = {
-                "measurement": measurement,
-                "tags": tags,
-                "fields": fields,
-                "record": record,
-            }
+        extra = {
+            "measurement": measurement,
+            "tags": tags,
+            "fields": fields,
+            "record": record,
+        }
 
+        try:
             self.write_api.write(
                 bucket=INFLUXDB_V2_BUCKET,
                 record=record,
                 record_measurement_name=measurement,
                 record_field_keys=fields,
                 record_tag_keys=tags,
-                write_precision=INFLUXDB_V2_WRITE_PRECISION,
+                write_precision=INFLUXDB_V2_WRITE_PRECISION,  # type: ignore[arg-type]
             )
 
             if isinstance(record, list):
@@ -176,10 +177,10 @@ class InfluxWriter:
 
     @staticmethod
     @lru_cache(maxsize=64)
-    def extract_keys(cls):
+    def extract_keys(point_cls):
         tag_keys = []
         field_keys = []
-        for f in fields(cls):
+        for f in fields(point_cls):
             kind = f.metadata.get("influx_kind")
             if kind == "tag":
                 tag_keys.append(f.name)
@@ -206,7 +207,7 @@ class InfluxWriter:
                 record_measurement_name=annotation_data.measurement_name,
                 record_field_keys=field_keys,
                 record_tag_keys=tag_keys,
-                write_precision=INFLUXDB_V2_WRITE_PRECISION,
+                write_precision=INFLUXDB_V2_WRITE_PRECISION,  # type: ignore[arg-type]
             )
 
             end_info = f" to {annotation_data.end_time}" if annotation_data.end_time else ""

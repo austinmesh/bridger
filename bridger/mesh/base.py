@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Any
 
 
 class PacketHandler(ABC):
@@ -11,5 +11,5 @@ class PacketHandler(ABC):
         self.force_decode = force_decode
 
     @abstractmethod
-    def handle(self) -> Union[None, dict]:
+    def handle(self) -> Any:
         pass

@@ -26,7 +26,8 @@ async def on_startup(app):
 
 
 async def on_cleanup(app):
-    await session.close()
+    if session:
+        await session.close()
 
 
 @routes.get("/")
@@ -56,6 +57,8 @@ async def index_view(request):
 
 @routes.get("/model/displaynames/{model_id}")
 async def get_displaynames(request):
+    if not device:
+        return web.json_response({"error": "Device model not initialized"}, status=503)
     model_id = int(request.match_info["model_id"])
     displaynames = await device.get_displaynames(model_id)
     return web.json_response(displaynames)
@@ -63,6 +66,8 @@ async def get_displaynames(request):
 
 @routes.get("/model/displaynames")
 async def get_displaynames_all(request):
+    if not device:
+        return web.json_response({"error": "Device model not initialized"}, status=503)
     displaynames = await device.get_all_displaynames()
     return web.json_response(displaynames)
 

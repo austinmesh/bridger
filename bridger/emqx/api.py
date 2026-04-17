@@ -1,4 +1,11 @@
+from typing import Any
+
+import requests
+
+
 class ApiMixin:
+    def _request(self, method: str, endpoint: str, data: Any = None, params: Any = None) -> requests.Response: ...
+
     def list_api_keys(self):
         endpoint = "/api_key"
         return self._request("GET", endpoint)

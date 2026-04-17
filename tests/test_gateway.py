@@ -1,15 +1,18 @@
+from dataclasses import dataclass
 from unittest.mock import MagicMock
 
 import pytest
-from discord import User
 from requests import HTTPError
 
 from bridger.gateway import GatewayData, GatewayError, GatewayManagerEMQX
 
-# Sample data for mocking
-state_mock = MagicMock()
-user_data = {"id": 1234567890, "username": "test_user", "discriminator": "1234", "avatar": "test_avatar"}
-mock_discord_user = User(data=user_data, state=state_mock)
+
+@dataclass
+class MockDiscordUser:
+    id: int
+
+
+mock_discord_user = MockDiscordUser(id=1234567890)
 mock_gateway_data = {"user_id": "1234567890-1a2b3c4d"}
 
 

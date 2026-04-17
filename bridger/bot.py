@@ -7,12 +7,14 @@ from discord.ext import commands
 from bridger.influx import create_influx_client
 from bridger.log import logger
 
-try:
-    DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-    DISCORD_BOT_OWNER_ID = int(os.getenv("DISCORD_BOT_OWNER_ID"))
-except TypeError as e:
-    logger.error(f"Failed to load environment variable {e}")
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+DISCORD_BOT_OWNER_ID_STR = os.getenv("DISCORD_BOT_OWNER_ID")
+
+if not DISCORD_BOT_TOKEN or not DISCORD_BOT_OWNER_ID_STR:
+    logger.error("DISCORD_BOT_TOKEN and DISCORD_BOT_OWNER_ID must be set")
     exit(1)
+
+DISCORD_BOT_OWNER_ID = int(DISCORD_BOT_OWNER_ID_STR)
 
 
 class BridgerBot(commands.Bot):

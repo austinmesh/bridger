@@ -9,15 +9,17 @@ from bridger.config import MESHTASTIC_API_CACHE_TTL, MESHTASTIC_API_ENDPOINT
 class DeviceModel:
     device_hardware_path = "/resource/deviceHardware"
 
-    def __init__(self, session: ClientSession = None):
+    def __init__(self, session: ClientSession | None = None):
         self.session = session
 
     @cached(ttl=MESHTASTIC_API_CACHE_TTL)
     async def make_request(self) -> list:
+        if not self.session:
+            raise RuntimeError("ClientSession is not initialized")
         async with self.session.get(MESHTASTIC_API_ENDPOINT + self.device_hardware_path) as response:
             return await response.json()
 
-    async def get_models(self, model_id: int = None) -> list:
+    async def get_models(self, model_id: int | None = None) -> list:
         response = await self.make_request()
         return [model for model in response if model["hwModel"] == model_id]
 

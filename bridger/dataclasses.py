@@ -6,6 +6,9 @@ from dataclasses_json import Undefined, config, dataclass_json
 
 
 class NodeMixin:
+    _from: int
+    node_id: int
+
     def _get_node_id(self) -> int:
         if hasattr(self, "_from"):
             return self._from

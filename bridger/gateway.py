@@ -3,15 +3,20 @@ import re
 import secrets
 import string
 from dataclasses import dataclass
-from typing import Generator, Union
+from typing import Protocol
 
-from discord import Member, User
 from requests import HTTPError
 
 from bridger.config import MQTT_TOPIC
 from bridger.dataclasses import NodeMixin
 from bridger.emqx import EMQXClient
 from bridger.log import logger
+
+
+class DiscordUserLike(Protocol):
+    @property
+    def id(self) -> int: ...
+
 
 EMQX_API_KEY = os.getenv("EMQX_API_KEY")
 EMQX_SECRET_KEY = os.getenv("EMQX_SECRET_KEY")
@@ -44,7 +49,7 @@ class GatewayManagerEMQX:
         self.emqx = emqx
 
     @staticmethod
-    def prepare_gateway_id(gateway_id: str) -> tuple[str, str]:
+    def prepare_gateway_id(gateway_id: str) -> tuple[str, str, int]:
         # Prepend ! to gateway_id if it doesn't have it
         if not gateway_id.startswith("!"):
             gateway_id = f"!{gateway_id}"
@@ -70,7 +75,7 @@ class GatewayManagerEMQX:
         alphabet = string.ascii_letters + string.digits
         return "".join(secrets.choice(alphabet) for i in range(PASSWORD_LENGTH))
 
-    def list_gateways(self) -> Generator[GatewayData, None, None]:
+    def list_gateways(self) -> list[GatewayData]:
         emqx_users = self.emqx.list_users(self.authentication_id)
 
         # Filter for users that match only our regex pattern
@@ -92,7 +97,7 @@ class GatewayManagerEMQX:
         mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/+/{gateway_id}", "permission": "allow"}]
         return {"rules": mqtt_rules, "username": username}
 
-    def create_gateway_user(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
+    def create_gateway_user(self, gateway_id: str, discord_user: DiscordUserLike) -> tuple[GatewayData, str]:
         gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
         password = self.generate_password()
 
@@ -141,7 +146,7 @@ class GatewayManagerEMQX:
 
         raise ValueError("Gateway not found")
 
-    def reset_gateway_password(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
+    def reset_gateway_password(self, gateway_id: str, discord_user: DiscordUserLike) -> tuple[GatewayData, str]:
         gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
         gateway = GatewayData(node_id=node_id, owner_id=discord_user.id)
 

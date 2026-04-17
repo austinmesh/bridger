@@ -2,9 +2,9 @@ import os
 import re
 import time
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Literal, Optional, cast
 
-from discord import ButtonStyle, Embed, Interaction, app_commands, ui
+from discord import ButtonStyle, Embed, Interaction, Member, app_commands, ui
 from discord.ext import commands
 from discord.utils import get
 
@@ -16,13 +16,13 @@ from bridger.log import logger
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
 
 
-async def node_id_autocomplete(interaction: Interaction, current: str) -> List[app_commands.Choice[str]]:
+async def node_id_autocomplete(interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
     """Autocomplete function for node_id parameter."""
     try:
         logger.debug(f"Autocomplete called with current='{current}'")
 
         # Get all known node IDs with display names from InfluxDB
-        influx_reader = InfluxReader(interaction.client.influx_client)
+        influx_reader = InfluxReader(interaction.client.influx_client)  # type: ignore[attr-defined]
         nodes = influx_reader.get_all_node_ids()
         logger.debug(f"Found {len(nodes)} nodes from InfluxDB")
 
@@ -59,16 +59,16 @@ def check_gateway_owner(interaction: Interaction) -> bool:
     logger.debug(f"Interaction data: {interaction.data}")
 
     # Extract node_id from interaction options
-    if "options" in interaction.data:
-        for option in interaction.data["options"]:
+    if interaction.data and "options" in interaction.data:
+        for option in interaction.data["options"]:  # type: ignore[typeddict-item]
             if "options" in option:
-                for sub_option in option["options"]:
+                for sub_option in option["options"]:  # type: ignore[typeddict-item]
                     if sub_option["name"] == "node_id":
-                        node_id = sub_option["value"]
+                        node_id = sub_option["value"]  # type: ignore[typeddict-item]
                         break
             # Also check direct options (not nested)
             elif option.get("name") == "node_id":
-                node_id = option["value"]
+                node_id = option["value"]  # type: ignore[typeddict-item]
                 break
 
     if not node_id:
@@ -76,7 +76,7 @@ def check_gateway_owner(interaction: Interaction) -> bool:
         raise ValueError("node_id not found in the command options")
 
     # Normalize node_id (remove leading !)
-    normalized_node_id = node_id.lstrip("!")
+    normalized_node_id = str(node_id).lstrip("!")
     logger.debug(f"Checking ownership for node ID: {normalized_node_id}")
 
     try:
@@ -103,8 +103,11 @@ def check_gateway_owner(interaction: Interaction) -> bool:
 
 def is_bridger_admin(interaction: Interaction) -> bool:
     """Check if user has the Bridger admin role."""
+    if not interaction.guild:
+        return False
     bridger_admin_role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
-    has_admin_role = bridger_admin_role and bridger_admin_role in interaction.user.roles
+    member = cast(Member, interaction.user) if interaction.guild else None
+    has_admin_role = bool(bridger_admin_role and member and bridger_admin_role in member.roles)
     logger.debug(f"User {interaction.user} has admin role: {has_admin_role}")
     return has_admin_role
 
@@ -201,7 +204,7 @@ class GatewayPaginationView(ui.View):
 
     async def on_timeout(self):
         for item in self.children:
-            item.disabled = True
+            item.disabled = True  # type: ignore[union-attr]
 
 
 class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
@@ -338,8 +341,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             )
         else:
             records = tables[0].records
-            record = max(records, key=lambda r: r.values.get("_time"))
-            packet_time = int(record.values.get("_time").timestamp())
+            record = max(records, key=lambda r: r.values.get("_time"))  # type: ignore[return-value]
+            packet_time = int(record.values.get("_time").timestamp())  # type: ignore[union-attr]
 
             await ctx.response.send_message(
                 f"Gateway **{gateway.node_hex_id_without_bang}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
@@ -456,7 +459,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         # Write to InfluxDB
         try:
-            writer = InfluxWriter(self.bot.influx_client)
+            writer = InfluxWriter(self.bot.influx_client)  # type: ignore[attr-defined]
             writer.write_annotation(annotation)
 
             # Build response message
@@ -596,5 +599,5 @@ def parse_time_string(time_str: str) -> Optional[int]:
 
 async def setup(bot):
     gateway_manager = GatewayManagerEMQX(emqx)
-    influx_reader = InfluxReader(influx_client=bot.influx_client)
+    influx_reader = InfluxReader(influx_client=bot.influx_client)  # type: ignore[attr-defined]
     await bot.add_cog(MQTTCog(bot, gateway_manager, influx_reader))

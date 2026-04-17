@@ -1,7 +1,7 @@
 import base64
 
 from google.protobuf.message import DecodeError
-from influxdb_client import InfluxDBClient
+from influxdb_client.client.influxdb_client import InfluxDBClient
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
@@ -20,7 +20,11 @@ class BridgerMQTT(Client):
         super().__init__(*args, **kwargs)
         self.deduplicator = PacketDeduplicator(maxlen=100)
 
-    def on_connect(self, client, userdata, flags, reason_code, properties):
+        self.on_connect = self._bridger_on_connect  # type: ignore[assignment]
+        self.on_disconnect = self._bridger_on_disconnect  # type: ignore[assignment]
+        self.on_message = self._bridger_on_message  # type: ignore[assignment]
+
+    def _bridger_on_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code != 0:
             logger.error(f"Connection failed with code: {reason_code}. Attempting to reconnect...")
             return
@@ -32,11 +36,11 @@ class BridgerMQTT(Client):
 
         logger.info(f"Connected and subscribed to topic: {MQTT_TOPIC}")
 
-    def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+    def _bridger_on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         if reason_code == 0:
             logger.info("Disconnected")
 
-    def on_message(self, client, userdata, message):
+    def _bridger_on_message(self, client, userdata, message):
         message_payload = base64.b64encode(message.payload)
         breadcrumb_data = {"topic": message.topic, "payload": message_payload}
 

@@ -65,7 +65,7 @@ class TestPBPacketProcessor:
 
     def test_init_failure(self, service_envelope: ServiceEnvelope):
         modified_envelope = ServiceEnvelope.FromString(node_info2)
-        modified_envelope.packet.decoded.portnum = 6
+        modified_envelope.packet.decoded.portnum = 6  # type: ignore[assignment]
         with pytest.raises(PacketProcessorError):
             processor = PBPacketProcessor(modified_envelope)
             processor.payload

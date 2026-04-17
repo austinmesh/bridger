@@ -146,7 +146,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                 processor = PBPacketProcessor(service_envelope=service_envelope, strip_text=False)
 
                 if processor.portnum == TEXT_MESSAGE_APP:
-                    data: TextMessagePoint = processor.data
+                    data: TextMessagePoint = processor.data  # type: ignore[assignment]
                     if not data or not data.text:
                         continue
 
@@ -178,9 +178,13 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
                     logger.bind(**extra).debug(f"Message ID {message_id} for packet ID {packet_id} from {name}")
 
+                    if not self.discord_channel:
+                        logger.warning("Discord channel not initialized")
+                        continue
+
                     if message_id:
                         try:
-                            message = await self.discord_channel.fetch_message(message_id)
+                            message = await self.discord_channel.fetch_message(message_id)  # type: ignore[union-attr]
                             await self.update_message_embeds(message, service_envelope)
                         except Exception:
                             logger.exception("Failed to fetch or edit Discord message")
@@ -190,7 +194,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
                         embeds = [self.create_embed(service_envelope)]
                         try:
-                            message: Message = await self.discord_channel.send(content, embeds=embeds)
+                            message: Message = await self.discord_channel.send(content, embeds=embeds)  # type: ignore[union-attr]
                             await self.queue.set(packet_id, message.id, ttl=3600)
                         except Exception:
                             logger.exception("Failed to send Discord message")
@@ -201,12 +205,14 @@ def restart_mqtt_on_exception(task, bot: commands.Bot):
         task.result()
     except Exception:
         logger.exception("MQTT task failed. Restarting...")
-        new_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
+        cog = bot.cogs["testmsg"]
+        new_task = bot.loop.create_task(cog.run_mqtt())  # type: ignore[attr-defined]
         new_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))
 
 
 async def setup(bot: commands.Bot):
-    influx_reader = InfluxReader(influx_client=bot.influx_client)
+    influx_reader = InfluxReader(influx_client=bot.influx_client)  # type: ignore[attr-defined]
     await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_DISCORD, influx_reader))
-    run_mqtt_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
+    cog = bot.cogs["testmsg"]
+    run_mqtt_task = bot.loop.create_task(cog.run_mqtt())  # type: ignore[attr-defined]
     run_mqtt_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))

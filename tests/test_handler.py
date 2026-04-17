@@ -27,7 +27,7 @@ def test_handler_decorator_raises_if_missing_portnum():
 
 def test_packet_handler_abstract_instantiation():
     with pytest.raises(TypeError):
-        PacketHandler(packet=None, payload_dict={}, base_data={})
+        PacketHandler(packet=None, payload_dict={}, base_data={})  # type: ignore[abstract]
 
 
 def test_concrete_packet_handler_usage():

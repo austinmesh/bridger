@@ -40,18 +40,16 @@ def position_point():
         longitude_i=2000000,
         altitude=50,
         precision_bits=10,
-        speed=0,
-        time=1234567890,
     )
 
 
 class TestInfluxWriter:
-    def test_common_tags_included_in_write(self, influx_writer: InfluxWriter, position_point):
-        writer = InfluxWriter(influx_writer)
+    def test_common_tags_included_in_write(self, influx_writer: InfluxWriter, position_point, influx_client, mock_write_api):
+        writer = InfluxWriter(influx_client)
         writer.write_point(position_point)
 
         # Extract the tag keys argument from the call to write()
-        tag_keys = influx_writer.write_api().write.call_args.kwargs.get("record_tag_keys", [])
+        tag_keys = mock_write_api.write.call_args.kwargs.get("record_tag_keys", [])
 
         # Check that common tags are included
         expected_tags = {"channel_id", "gateway_id", "_from", "to"}

@@ -32,8 +32,8 @@ class TestHappyPathPoints:
             TelemetryPoint(**common_parameters_good)
 
     def test_node_info_point(self, common_parameters_good):
-        node_info = NodeInfoPoint(**common_parameters_good, id=3764567, long_name="test", short_name="test")
-        assert node_info.id == 3764567
+        node_info = NodeInfoPoint(**common_parameters_good, id="3764567", long_name="test", short_name="test")
+        assert node_info.id == "3764567"
         assert node_info.long_name == "test"
         assert node_info.short_name == "test"
         assert node_info._from == 111222333
@@ -95,36 +95,36 @@ class TestHappyPathPoints:
 class TestExtraArgumentsPasses:
     def test_telemetry_point(self, common_parameters_good):
         with pytest.raises(TypeError):
-            TelemetryPoint(**common_parameters_good, extra=1)
+            TelemetryPoint(**common_parameters_good, extra=1)  # type: ignore[call-arg]
 
     def test_node_info_point(self, common_parameters_good):
-        node_info = NodeInfoPoint(**common_parameters_good, id=3764567, long_name="test", short_name="test", extra=1)
+        node_info = NodeInfoPoint(**common_parameters_good, id="3764567", long_name="test", short_name="test", extra=1)  # type: ignore[call-arg]
 
         with pytest.raises(AttributeError):
-            node_info.extra
+            node_info.extra  # type: ignore[attr-defined]
 
     def test_sensor_telemetry_point(self, common_parameters_good):
-        sensor_telemetry = SensorTelemetryPoint(**common_parameters_good, barometric_pressure=1.0, temperature=96.0, extra=1)
+        sensor_telemetry = SensorTelemetryPoint(**common_parameters_good, barometric_pressure=1.0, temperature=96.0, extra=1)  # type: ignore[call-arg]
 
         with pytest.raises(AttributeError):
-            sensor_telemetry.extra
+            sensor_telemetry.extra  # type: ignore[attr-defined]
 
     def test_position_point(self, common_parameters_good):
-        position = PositionPoint(**common_parameters_good, latitude_i=30293845, longitude_i=9736521, extra=1)
+        position = PositionPoint(**common_parameters_good, latitude_i=30293845, longitude_i=9736521, extra=1)  # type: ignore[call-arg]
 
         with pytest.raises(AttributeError):
-            position.extra
+            position.extra  # type: ignore[attr-defined]
 
     def test_device_telemetry_point(self, common_parameters_good):
-        device_telemetry = DeviceTelemetryPoint(**common_parameters_good, voltage=1.0, battery_level=1, extra=1)
+        device_telemetry = DeviceTelemetryPoint(**common_parameters_good, voltage=1.0, battery_level=1, extra=1)  # type: ignore[call-arg]
 
         with pytest.raises(AttributeError):
-            device_telemetry.extra
+            device_telemetry.extra  # type: ignore[attr-defined]
 
     def test_annotation_point(self):
         annotation = AnnotationPoint(
-            node_id="cbaf0421", annotation_type="general_maintenance", body="Test annotation", author="TestUser", extra=1
+            node_id="cbaf0421", annotation_type="general_maintenance", body="Test annotation", author="TestUser", extra=1  # type: ignore[call-arg]
         )
 
         with pytest.raises(AttributeError):
-            annotation.extra
+            annotation.extra  # type: ignore[attr-defined]

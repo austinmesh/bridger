@@ -1,4 +1,5 @@
-from paho.mqtt.client import MQTT_ERR_SUCCESS, CallbackAPIVersion
+from paho.mqtt.client import MQTT_ERR_SUCCESS
+from paho.mqtt.enums import CallbackAPIVersion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_USER

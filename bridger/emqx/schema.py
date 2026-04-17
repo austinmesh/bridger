@@ -68,9 +68,7 @@ class AuthnBuiltinDB(Authn):
     bootstrap_type: str = "plain"
     enable: bool = True
 
-    password_hash_algorithm: Optional[Union[AuthnHashSimple, AuthnHashBcryptRW, AuthnHashPBKDF2]] = field(
-        default_factory=dict
-    )
+    password_hash_algorithm: Optional[Union[AuthnHashSimple, AuthnHashBcryptRW, AuthnHashPBKDF2]] = None
 
     def __post_init__(self):
         valid_mechanisms = ["password_based"]
@@ -109,10 +107,10 @@ class AuthorizationRule:
 @dataclass
 class AuthorizationUsersRules:
     username: str
-    rules: list[AuthorizationRule]
+    rules: list  # Accepts list of dicts or AuthorizationRule, coerced in __post_init__
 
     def __post_init__(self):
-        self.rules = [AuthorizationRule(**rule) for rule in self.rules]
+        self.rules = [AuthorizationRule(**rule) if isinstance(rule, dict) else rule for rule in self.rules]
 
 
 @dataclass
@@ -138,9 +136,10 @@ class PublicMeta:
 
 @dataclass
 class ResponseUsers:
-    users: list[User]
-    meta: PublicMeta
+    users: list  # Accepts list of dicts or User, coerced in __post_init__
+    meta: PublicMeta | dict  # Accepts dict or PublicMeta, coerced in __post_init__
 
     def __post_init__(self):
-        self.users = [User(**user) for user in self.users]
-        self.meta = PublicMeta(**self.meta)
+        self.users = [User(**user) if isinstance(user, dict) else user for user in self.users]
+        if isinstance(self.meta, dict):
+            self.meta = PublicMeta(**self.meta)

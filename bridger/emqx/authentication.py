@@ -1,4 +1,12 @@
+from typing import Any
+
+import requests
+
+
 class AuthenticationMixin:
+    def _request(self, method: str, endpoint: str, data: Any = None, params: Any = None) -> requests.Response: ...
+    def _handle_response(self, response: requests.Response) -> Any: ...
+
     def list_users(self, authentication_id):
         endpoint = f"/authentication/{authentication_id}/users"
         response = self._request("GET", endpoint)

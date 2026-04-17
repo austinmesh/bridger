@@ -84,8 +84,8 @@ class PBPacketProcessor(PacketProcessor):
         if self.portnum in HANDLER_MAP:
             payload = self.service_envelope.packet.decoded.payload
 
-            if self.portnum_protocol.protobufFactory:
-                return self.portnum_protocol.protobufFactory.FromString(payload)
+            if self.portnum_protocol and self.portnum_protocol.protobufFactory:
+                return self.portnum_protocol.protobufFactory.FromString(payload)  # type: ignore[attr-defined]
             else:
                 try:
                     return payload.decode("utf-8")
