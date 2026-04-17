@@ -75,3 +75,52 @@ class TestBridgerMQTT:
             assert (
                 len(mqtt_client.deduplicator.message_queue) == 1
             )  # The second packet should be skipped, queue length should remain 1
+
+    def _make_meshcore_message(self, public_key: str, hash_value: str) -> MQTTMessage:
+        import json as _json
+
+        msg = MQTTMessage()
+        msg.topic = f"fake/meshcore/AUS/{public_key}/packets".encode()
+        msg.payload = _json.dumps(
+            {
+                "timestamp": "2026-04-11T00:00:00",
+                "origin": "test relay",
+                "origin_id": public_key,
+                "type": "PACKET",
+                "direction": "rx",
+                "len": "54",
+                "packet_type": "5",
+                "route": "D",
+                "payload_len": "51",
+                "raw": "150142592837c57407f7965593ba3e513470bc3da2ad4bd0ac5f13056259c14abe2b590adbb637a8ba4b29e2e8d52b1997c18d5d1cf0",
+                "SNR": "12.5",
+                "RSSI": "-32",
+                "score": "1000",
+                "duration": "0",
+                "hash": hash_value,
+            }
+        ).encode()
+        return msg
+
+    def test_meshcore_duplicate_from_same_observer_skipped(self, mqtt_client):
+        public_key = "A" * 64
+        msg = self._make_meshcore_message(public_key, "DEADBEEF")
+
+        mqtt_client.on_message(mqtt_client, None, msg)
+        assert len(mqtt_client.meshcore_deduplicator.message_queue) == 1
+
+        # Same observer, same hash -> skipped
+        mqtt_client.on_message(mqtt_client, None, msg)
+        assert len(mqtt_client.meshcore_deduplicator.message_queue) == 1
+
+    def test_meshcore_same_hash_different_observers_kept(self, mqtt_client):
+        pk1 = "A" * 64
+        pk2 = "B" * 64
+        msg1 = self._make_meshcore_message(pk1, "DEADBEEF")
+        msg2 = self._make_meshcore_message(pk2, "DEADBEEF")
+
+        mqtt_client.on_message(mqtt_client, None, msg1)
+        mqtt_client.on_message(mqtt_client, None, msg2)
+
+        # Different observers reporting the same packet hash -> both kept
+        assert len(mqtt_client.meshcore_deduplicator.message_queue) == 2

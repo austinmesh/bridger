@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
+from meshcoredecoder.types.crypto import DecryptionOptions
+
 from bridger.config import MESHCORE_MQTT_TOPIC
 from bridger.log import logger
 from bridger.meshcore.handler_registry import MESHCORE_HANDLER_MAP
@@ -42,9 +44,10 @@ class MCPacketProcessor:
     # Extract the base prefix from config (remove the wildcard)
     TOPIC_PREFIX = MESHCORE_MQTT_TOPIC.rstrip("#")
 
-    def __init__(self, topic: str, payload: bytes):
+    def __init__(self, topic: str, payload: bytes, decryption_options: Optional[DecryptionOptions] = None):
         self.topic = topic
         self.raw_payload = payload
+        self.decryption_options = decryption_options
         self._parsed_json: Optional[dict] = None
         self._metadata: Optional[MeshCoreMetadata] = None
         self._data_type: Optional[str] = None
@@ -134,6 +137,18 @@ class MCPacketProcessor:
         return self._data_type
 
     @property
+    def message_hash(self) -> Optional[str]:
+        """The observer's packet hash from the packets-topic JSON envelope.
+
+        Used for deduplication before decoding. Returns None for status
+        messages and for heartbeat packets (empty hash string).
+        """
+        if self._data_type != "packets":
+            return None
+        raw_hash = self._parsed_json.get("hash")
+        return raw_hash or None
+
+    @property
     def payload(self) -> Union[str, dict]:
         """Return the processed payload for handlers.
 
@@ -152,6 +167,8 @@ class MCPacketProcessor:
                 "RSSI": self._safe_int(self._parsed_json.get("RSSI", "")),
                 "direction": self._parsed_json.get("direction"),
                 "route": self._parsed_json.get("route"),
+                "score": self._safe_int(self._parsed_json.get("score", "")),
+                "duration": self._safe_int(self._parsed_json.get("duration", "")),
                 "hash": self._parsed_json.get("hash"),
                 "path": self._parsed_json.get("path"),
             }
@@ -159,7 +176,7 @@ class MCPacketProcessor:
             try:
                 from meshcoredecoder import MeshCoreDecoder
 
-                decoded = MeshCoreDecoder.decode(hex_str)
+                decoded = MeshCoreDecoder.decode(hex_str, self.decryption_options)
                 decoded_dict = decoded.to_dict() if hasattr(decoded, "to_dict") else vars(decoded)
                 decoded_dict["envelope"] = envelope
                 logger.debug(f"Decoded MeshCore packet: {decoded_dict}")

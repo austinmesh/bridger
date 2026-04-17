@@ -7,7 +7,7 @@ from paho.mqtt.client import Client
 from sentry_sdk import add_breadcrumb, set_user
 
 from bridger.config import MESHCORE_ENABLED, MESHCORE_INFLUXDB_BUCKET, MESHCORE_MQTT_TOPIC, MQTT_TOPIC
-from bridger.deduplication import PacketDeduplicator
+from bridger.deduplication import MeshCoreDeduplicator, PacketDeduplicator
 from bridger.influx.interfaces import InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
@@ -19,6 +19,7 @@ class BridgerMQTT(Client):
         self.influx_client = influx_client  # Before super().__init__ call so it isn't passed to the parent class
         super().__init__(*args, **kwargs)
         self.deduplicator = PacketDeduplicator(maxlen=100)
+        self.meshcore_deduplicator = MeshCoreDeduplicator(maxlen=100)
         # Extract the base prefix from meshcore topic (remove the wildcard)
         self.meshcore_topic_prefix = MESHCORE_MQTT_TOPIC.rstrip("#")
 
@@ -107,6 +108,15 @@ class BridgerMQTT(Client):
 
         try:
             processor = MCPacketProcessor(message.topic, message.payload)
+
+            # Deduplicate packet messages by (public_key, message_hash).
+            # Same hash from different observers is kept (distinct SNR/RSSI);
+            # status messages have no hash and skip the check.
+            if processor.message_hash and not self.meshcore_deduplicator.should_process(
+                processor.message_hash, processor.public_key
+            ):
+                return
+
             data = processor.data
 
             if data:

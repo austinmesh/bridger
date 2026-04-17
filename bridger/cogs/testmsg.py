@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from datetime import datetime
@@ -12,13 +13,24 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
+from bridger.config import (
+    MESHCORE_ENABLED,
+    MESHCORE_MQTT_TOPIC,
+    MESHCORE_TEST_CHANNEL_HASH,
+    MESHCORE_TEST_CHANNEL_KEY,
+    MESHCORE_TEST_CHANNEL_NAME,
+    MQTT_BROKER,
+    MQTT_PASS,
+    MQTT_PORT,
+    MQTT_TOPIC,
+    MQTT_USER,
+)
 from bridger.dataclasses import NodeData, TextMessagePoint
-from bridger.deduplication import PacketDeduplicator
+from bridger.deduplication import MeshCoreDeduplicator, PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
 from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
-from bridger.utils import should_ignore_pki_message
+from bridger.utils import format_meshcore_path, should_ignore_pki_message
 
 MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
@@ -26,6 +38,8 @@ TEST_MESSAGE_MATCHERS = [
     re.compile(r"^.*$", flags=re.IGNORECASE) if os.getenv("TEST_MESSAGE_MATCH_ALL", "false").lower() == "true" else None,
     re.compile(r"^\!\b.+$", flags=re.IGNORECASE),
 ]
+
+PAYLOAD_TYPE_GROUP_TEXT = 5
 
 
 class TestMsg(commands.GroupCog, name="testmsg"):
@@ -38,6 +52,20 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel = None
         self.influx_reader = influx_reader
         self.deduplicator = PacketDeduplicator(maxlen=100, use_gateway_id=True)
+        self.mc_deduplicator = MeshCoreDeduplicator(maxlen=100)
+        self.mc_decryption_options = None
+
+        if MESHCORE_TEST_CHANNEL_KEY:
+            from meshcoredecoder.crypto import MeshCoreKeyStore
+            from meshcoredecoder.types.crypto import DecryptionOptions
+
+            key_store = MeshCoreKeyStore()
+            key_store.add_channel_secrets([MESHCORE_TEST_CHANNEL_KEY])
+            self.mc_decryption_options = DecryptionOptions(key_store=key_store)
+            logger.info(
+                f"MeshCore test channel #{MESHCORE_TEST_CHANNEL_NAME} configured "
+                f"(channel_hash={MESHCORE_TEST_CHANNEL_HASH})"
+            )
 
     @commands.Cog.listener(name="on_ready")
     async def on_ready(self):
@@ -195,6 +223,131 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                         except Exception:
                             logger.exception("Failed to send Discord message")
 
+    def create_meshcore_embed(self, public_key: str, origin: str, snr, rssi, path):
+        color = int(public_key[-6:], 16)
+        formatted_time = datetime.now().strftime("%H:%M:%S")
+        path_str = format_meshcore_path(path) if path else "Direct"
+        gateway_short = public_key[:8]
+        display_name = origin or gateway_short
+
+        embed = Embed(color=color)
+        embed.description = f"Heard by **{display_name}** - `{gateway_short}` at {formatted_time}"
+        if snr is not None:
+            embed.add_field(name="SNR", value=snr, inline=True)
+        if rssi is not None:
+            embed.add_field(name="RSSI", value=rssi, inline=True)
+        embed.add_field(name="Path", value=path_str, inline=True)
+
+        return embed
+
+    async def update_meshcore_message_embeds(self, message: Message, **embed_kwargs):
+        if len(message.embeds) >= 10:
+            logger.warning(f"Embed limit reached for message ID {message.id}, skipping update")
+            return
+        message.embeds.append(self.create_meshcore_embed(**embed_kwargs))
+        await message.edit(embeds=message.embeds)
+
+    @retry(
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        retry=retry_if_exception_type((aiomqtt.MqttError, ConnectionRefusedError, OSError)),
+        reraise=True,
+    )
+    async def run_meshcore_mqtt(self):
+        from meshcoredecoder import MeshCoreDecoder
+
+        topic_prefix = MESHCORE_MQTT_TOPIC.rstrip("#")
+
+        logger.info(f"MeshCore TestMsg: connecting to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
+        async with aiomqtt.Client(
+            MQTT_BROKER,
+            int(MQTT_PORT),
+            username=MQTT_USER,
+            password=MQTT_PASS,
+            clean_session=True,
+        ) as client:
+            await client.subscribe(MESHCORE_MQTT_TOPIC)
+            logger.info(f"MeshCore TestMsg: subscribed to {MESHCORE_MQTT_TOPIC}")
+            await logger.complete()
+
+            async for mqtt_message in client.messages:
+                try:
+                    topic = str(mqtt_message.topic)
+                    relative = topic[len(topic_prefix) :]
+                    parts = relative.split("/")
+
+                    if len(parts) != 3 or parts[2] != "packets":
+                        continue
+
+                    iata = parts[0]
+                    public_key = parts[1]
+
+                    payload = json.loads(mqtt_message.payload.decode("utf-8"))
+                    raw_hex = payload.get("raw", "")
+                    if not raw_hex.strip():
+                        continue
+
+                    decoded = MeshCoreDecoder.decode(raw_hex, self.mc_decryption_options)
+
+                    if decoded.payload_type.value != PAYLOAD_TYPE_GROUP_TEXT:
+                        continue
+
+                    group_text = decoded.payload.get("decoded")
+                    if not group_text:
+                        continue
+
+                    if group_text.channel_hash != MESHCORE_TEST_CHANNEL_HASH:
+                        continue
+
+                    # Check for !b match in decrypted text
+                    if not group_text.decrypted or not group_text.decrypted.get("message"):
+                        logger.debug("MeshCore GroupText: decryption failed or no message content")
+                        continue
+
+                    message_text = group_text.decrypted["message"]
+                    if not any(pattern.match(message_text) for pattern in TEST_MESSAGE_MATCHERS if pattern):
+                        continue
+
+                    logger.debug(f"MeshCore test message matched: {message_text}")
+
+                    message_hash = decoded.message_hash
+                    if not self.mc_deduplicator.should_process(message_hash, public_key):
+                        continue
+
+                    snr = float(payload.get("SNR", 0)) if payload.get("SNR") else None
+                    rssi = int(float(payload.get("RSSI", 0))) if payload.get("RSSI") else None
+                    origin = payload.get("origin")
+                    path = decoded.path
+
+                    cache_key = f"mc:{message_hash}"
+                    message_id = await self.queue.get(cache_key)
+
+                    embed_kwargs = dict(public_key=public_key, origin=origin, snr=snr, rssi=rssi, path=path)
+
+                    sender = group_text.decrypted.get("sender", "Unknown")
+
+                    if message_id:
+                        try:
+                            message = await self.discord_channel.fetch_message(message_id)
+                            await self.update_meshcore_message_embeds(message, **embed_kwargs)
+                        except Exception:
+                            logger.exception("Failed to fetch or edit Discord message for MeshCore")
+                    else:
+                        now_timestamp = int(datetime.now().timestamp())
+                        content = (
+                            f"MeshCore test message from **{sender}** on "
+                            f"`#{MESHCORE_TEST_CHANNEL_NAME}` <t:{now_timestamp}:R>\n> {message_text}"
+                        )
+                        embeds = [self.create_meshcore_embed(**embed_kwargs)]
+                        try:
+                            message: Message = await self.discord_channel.send(content, embeds=embeds)
+                            await self.queue.set(cache_key, message.id, ttl=3600)
+                        except Exception:
+                            logger.exception("Failed to send Discord message for MeshCore")
+
+                except Exception:
+                    logger.exception("Error processing MeshCore test message")
+
 
 def restart_mqtt_on_exception(task, bot: commands.Bot):
     try:
@@ -205,8 +358,21 @@ def restart_mqtt_on_exception(task, bot: commands.Bot):
         new_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))
 
 
+def restart_meshcore_mqtt_on_exception(task, bot: commands.Bot):
+    try:
+        task.result()
+    except Exception:
+        logger.exception("MeshCore MQTT task failed. Restarting...")
+        new_task = bot.loop.create_task(bot.cogs["testmsg"].run_meshcore_mqtt())
+        new_task.add_done_callback(partial(restart_meshcore_mqtt_on_exception, bot=bot))
+
+
 async def setup(bot: commands.Bot):
     influx_reader = InfluxReader(influx_client=bot.influx_client)
     await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_DISCORD, influx_reader))
     run_mqtt_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
     run_mqtt_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))
+
+    if MESHCORE_ENABLED and MESHCORE_TEST_CHANNEL_NAME:
+        mc_task = bot.loop.create_task(bot.cogs["testmsg"].run_meshcore_mqtt())
+        mc_task.add_done_callback(partial(restart_meshcore_mqtt_on_exception, bot=bot))
