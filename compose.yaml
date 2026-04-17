@@ -167,24 +167,10 @@ services:
       - GF_SECURITY_ALLOW_EMBEDDING
       - GF_SERVER_ROOT_URL
       - GF_SERVER_PROTOCOL
-      - GF_RENDERING_SERVER_URL
-      - GF_RENDERING_CALLBACK_URL
       # - GF_INSTALL_PLUGINS=influxdb
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
       - grafana-storage:/var/lib/grafana
-    networks:
-      - bridger
-    restart: always
-
-  grafana-image-renderer:
-    image: docker.io/grafana/grafana-image-renderer:3.12.3
-    hostname: image-renderer
-    environment:
-      - HTTP_PORT=8088
-      - HTTP_HOST=0.0.0.0
-      - XDG_CONFIG_HOME=/tmp/.chromium
-      - XDG_CACHE_HOME=/tmp/.chromium
     networks:
       - bridger
     restart: always
