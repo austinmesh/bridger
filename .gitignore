@@ -216,3 +216,6 @@ pip-selfcheck.json
 *.afdesign~lock~
 *.env.*
 !.env.default
+
+# We are not using uv yet so let's ignore the uv.lock file for now
+uv.lock
