@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from bridger.deduplication import PacketDeduplicator
+from bridger.deduplication import MeshCoreDeduplicator, PacketDeduplicator
 
 
 @pytest.fixture
@@ -190,3 +190,52 @@ class TestPacketDeduplicatorWithGatewayId:
         assert ("!test", 1) in deduplicator_with_gateway_id.message_queue
         assert ("!test", 2) in deduplicator_with_gateway_id.message_queue
         assert ("!test", 3) in deduplicator_with_gateway_id.message_queue
+
+
+class TestMeshCoreDeduplicator:
+    @pytest.fixture
+    def mc_dedup(self):
+        return MeshCoreDeduplicator(maxlen=3)
+
+    def test_init_default_maxlen(self):
+        dedup = MeshCoreDeduplicator()
+        assert dedup.message_queue.maxlen == 100
+
+    def test_init_custom_maxlen(self):
+        dedup = MeshCoreDeduplicator(maxlen=50)
+        assert dedup.message_queue.maxlen == 50
+
+    def test_should_process_new_packet(self, mc_dedup):
+        assert mc_dedup.should_process("abc123", "gateway_key_1")
+
+    def test_should_process_duplicate_same_gateway(self, mc_dedup):
+        mc_dedup.should_process("abc123", "gateway_key_1")
+        assert not mc_dedup.should_process("abc123", "gateway_key_1")
+
+    def test_should_process_same_hash_different_gateway(self, mc_dedup):
+        assert mc_dedup.should_process("abc123", "gateway_key_1")
+        assert mc_dedup.should_process("abc123", "gateway_key_2")
+
+    def test_should_process_different_hash_same_gateway(self, mc_dedup):
+        assert mc_dedup.should_process("abc123", "gateway_key_1")
+        assert mc_dedup.should_process("def456", "gateway_key_1")
+
+    def test_bounded_deque_eviction(self, mc_dedup):
+        mc_dedup.should_process("hash1", "gw1")
+        mc_dedup.should_process("hash2", "gw1")
+        mc_dedup.should_process("hash3", "gw1")
+
+        assert len(mc_dedup.message_queue) == 3
+
+        # Adding a 4th evicts the oldest
+        mc_dedup.should_process("hash4", "gw1")
+        assert len(mc_dedup.message_queue) == 3
+
+        # hash1 was evicted, so it can be processed again
+        assert mc_dedup.should_process("hash1", "gw1")
+
+    @patch("bridger.deduplication.logger")
+    def test_duplicate_logs_message(self, mock_logger, mc_dedup):
+        mc_dedup.should_process("abc123", "gateway_key_1")
+        mc_dedup.should_process("abc123", "gateway_key_1")
+        mock_logger.bind.assert_called_with(message_hash="abc123")

@@ -1,6 +1,11 @@
 """Handler for MeshCore packet messages (HEX-encoded data)."""
 
-from bridger.dataclasses import MeshCoreAdvertPoint, MeshCorePacketPoint, MeshCoreTracePoint
+from bridger.dataclasses import (
+    MeshCoreAdvertPoint,
+    MeshCoreHopPoint,
+    MeshCorePacketPoint,
+    MeshCoreTracePoint,
+)
 from bridger.meshcore.base import MeshCoreHandler
 from bridger.meshcore.handler_registry import meshcore_handler
 
@@ -29,30 +34,72 @@ class PacketsHandler(MeshCoreHandler):
         payload_type = self.payload.get("payloadType")
 
         if payload_type == PAYLOAD_TYPE_ADVERT:
-            return self._handle_advert()
+            main_point = self._handle_advert()
         elif payload_type == PAYLOAD_TYPE_TRACE:
-            return self._handle_trace()
+            main_point = self._handle_trace()
         else:
-            return self._handle_generic()
+            main_point = self._handle_generic()
+
+        if not main_point:
+            return None
+
+        # Generate hop points for path data
+        hop_points = self._build_hop_points()
+
+        if hop_points:
+            return [main_point] + hop_points
+        return main_point
 
     def _get_envelope(self) -> dict:
         """Extract envelope metadata from the relay."""
         return self.payload.get("envelope", {})
+
+    def _envelope_kwargs(self) -> dict:
+        """Build kwargs for MeshCorePacket base-class envelope fields."""
+        envelope = self._get_envelope()
+        return {
+            "public_key": self.public_key,
+            "iata": self.iata,
+            "origin": self.origin,
+            "mqtt_hash": envelope.get("hash"),
+            "direction": envelope.get("direction"),
+            "route": envelope.get("route"),
+            "rx_snr": envelope.get("SNR"),
+            "rx_rssi": envelope.get("RSSI"),
+            "score": envelope.get("score"),
+            "duration": envelope.get("duration"),
+        }
+
+    def _build_hop_points(self) -> list:
+        """Build individual mc_hop points for each hop in the packet's path."""
+        path = self.payload.get("path")
+        if not path or not isinstance(path, list):
+            return []
+
+        path_length = len(path)
+        base_kwargs = self._envelope_kwargs()
+        points = []
+
+        for index, hop_hash in enumerate(path):
+            points.append(
+                MeshCoreHopPoint(
+                    **base_kwargs,
+                    hop_hash=str(hop_hash),
+                    hop_index=index,
+                    path_length=path_length,
+                )
+            )
+
+        return points
 
     def _handle_advert(self):
         """Handle Advert packets (PayloadType.Advert = 4)."""
         payload_decoded = self.payload.get("payload", {}).get("decoded", {})
         app_data = payload_decoded.get("appData", {})
         location = app_data.get("location", {})
-        envelope = self._get_envelope()
 
         return MeshCoreAdvertPoint(
-            public_key=self.public_key,
-            iata=self.iata,
-            origin=self.origin,
-            name=self.metadata.name,
-            ver=self.metadata.ver,
-            board=self.metadata.board,
+            **self._envelope_kwargs(),
             # Packet-level fields
             message_hash=self.payload.get("messageHash"),
             route_type=self.payload.get("routeType"),
@@ -70,26 +117,15 @@ class PacketsHandler(MeshCoreHandler):
             has_location=app_data.get("hasLocation"),
             latitude=location.get("latitude") if location else None,
             longitude=location.get("longitude") if location else None,
-            # Envelope metadata
-            snr=envelope.get("SNR"),
-            rssi=envelope.get("RSSI"),
-            direction=envelope.get("direction"),
-            mqtt_hash=envelope.get("hash"),
         )
 
     def _handle_trace(self):
         """Handle Trace packets (PayloadType.Trace = 9)."""
         payload_decoded = self.payload.get("payload", {}).get("decoded", {})
         path_hashes = payload_decoded.get("pathHashes", [])
-        envelope = self._get_envelope()
 
         return MeshCoreTracePoint(
-            public_key=self.public_key,
-            iata=self.iata,
-            origin=self.origin,
-            name=self.metadata.name,
-            ver=self.metadata.ver,
-            board=self.metadata.board,
+            **self._envelope_kwargs(),
             # Packet-level fields
             message_hash=self.payload.get("messageHash"),
             route_type=self.payload.get("routeType"),
@@ -102,24 +138,12 @@ class PacketsHandler(MeshCoreHandler):
             auth_code=payload_decoded.get("authCode"),
             flags=payload_decoded.get("flags"),
             path_hashes=",".join(path_hashes) if path_hashes else None,
-            # Envelope metadata
-            snr=envelope.get("SNR"),
-            rssi=envelope.get("RSSI"),
-            direction=envelope.get("direction"),
-            mqtt_hash=envelope.get("hash"),
         )
 
     def _handle_generic(self):
         """Handle unknown or minimal packet types (fallback)."""
-        envelope = self._get_envelope()
-
         return MeshCorePacketPoint(
-            public_key=self.public_key,
-            iata=self.iata,
-            origin=self.origin,
-            name=self.metadata.name,
-            ver=self.metadata.ver,
-            board=self.metadata.board,
+            **self._envelope_kwargs(),
             message_hash=self.payload.get("messageHash"),
             route_type=self.payload.get("routeType"),
             payload_type=self.payload.get("payloadType"),
@@ -127,9 +151,4 @@ class PacketsHandler(MeshCoreHandler):
             path_length=self.payload.get("pathLength"),
             total_bytes=self.payload.get("totalBytes"),
             is_valid=self.payload.get("isValid"),
-            # Envelope metadata
-            snr=envelope.get("SNR"),
-            rssi=envelope.get("RSSI"),
-            direction=envelope.get("direction"),
-            mqtt_hash=envelope.get("hash"),
         )

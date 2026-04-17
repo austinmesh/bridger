@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from bridger.utils import should_ignore_pki_message
+from bridger.utils import format_meshcore_path, should_ignore_pki_message
 
 
 class TestShouldIgnorePkiMessage:
@@ -40,3 +40,20 @@ class TestShouldIgnorePkiMessage:
 
         assert should_ignore_pki_message(pki_topic) is True
         assert should_ignore_pki_message(regular_topic) is False
+
+
+class TestFormatMeshcorePath:
+    def test_empty_path(self):
+        assert format_meshcore_path([]) == "Direct"
+
+    def test_single_hop(self):
+        assert format_meshcore_path(["a1b2c3d4"]) == "A1"
+
+    def test_multiple_hops(self):
+        assert format_meshcore_path(["42aabb", "8bccdd", "4feeff"]) == "42 -> 8B -> 4F"
+
+    def test_short_hashes(self):
+        assert format_meshcore_path(["ab", "cd"]) == "AB -> CD"
+
+    def test_uppercase_input(self):
+        assert format_meshcore_path(["AB", "CD"]) == "AB -> CD"
