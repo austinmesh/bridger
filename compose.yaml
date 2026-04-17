@@ -108,7 +108,7 @@ services:
       - emqx
 
   emqx:
-    image: docker.io/emqx/emqx:5.10.0
+    image: docker.io/emqx/emqx:5.10.3
     hostname: emqx
     environment:
       - EMQX_ALLOW_ANONYMOUS
@@ -155,7 +155,7 @@ services:
     restart: always
 
   grafana:
-    image: docker.io/grafana/grafana-oss:12.0.2
+    image: docker.io/grafana/grafana-oss:12.4.3
     hostname: grafana
     ports:
       - "3000:3000"
@@ -176,7 +176,7 @@ services:
     restart: always
 
   loki:
-    image: docker.io/grafana/loki:3.4.4
+    image: docker.io/grafana/loki:3.7.1
     hostname: loki
     command: ["-config.file=/mnt/config/loki.yaml"]
     volumes:
@@ -187,7 +187,7 @@ services:
     restart: always
 
   promtail:
-    image: docker.io/grafana/promtail:3.4.4
+    image: docker.io/grafana/promtail:3.6.10
     hostname: promtail
     command: ["-config.file=/mnt/config/promtail.yaml"]
     volumes:
@@ -201,7 +201,7 @@ services:
       - loki
 
   certbot:
-    image: docker.io/certbot/certbot:v4.1.1
+    image: docker.io/certbot/certbot:v5.5.0
     hostname: certbot
     command: ["certonly", "--standalone", "--non-interactive", "--agree-tos", "-d", "${CERTBOT_DOMAIN:-mybridger.com}", "--email", "${CERTBOT_EMAIL:-my@emailaddress.com}"]
     ports:
