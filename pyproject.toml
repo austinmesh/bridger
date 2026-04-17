@@ -11,6 +11,7 @@ name = "bridger"
 dynamic = ["version"]
 description = "A bridge between MQTT and InfluxDB for Meshtastic metrics"
 readme = "README.md"
+requires-python = ">=3.12"
 
 authors = [
     { name="Andy Shinn", email="andys@andyshinn.as" },
