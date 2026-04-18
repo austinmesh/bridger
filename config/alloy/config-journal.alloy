@@ -7,7 +7,7 @@ loki.relabel "journal_labels" {
   forward_to = []
 
   rule {
-    source_labels = ["__journal__systemd_unit"]
+    source_labels = ["__journal__systemd_user_unit"]
     target_label  = "unit"
   }
 
@@ -17,8 +17,58 @@ loki.relabel "journal_labels" {
   }
 }
 
-loki.source.journal "bridger_services" {
-  matches = "SYSLOG_IDENTIFIER=bridger-*"
+loki.source.journal "bridger" {
+  matches = "_SYSTEMD_USER_UNIT=bridger.service"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.source.journal "bot" {
+  matches = "_SYSTEMD_USER_UNIT=bot.service"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.source.journal "http" {
+  matches = "_SYSTEMD_USER_UNIT=http.service"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.source.journal "certbot" {
+  matches = "_SYSTEMD_USER_UNIT=certbot.service"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.source.journal "emqx" {
+  matches = "_SYSTEMD_USER_UNIT=emqx.service"
+  forward_to = [loki.process.bridger_parsing.receiver]
+  relabel_rules = loki.relabel.journal_labels.rules
+
+  labels = {
+    job = "bridger-services",
+  }
+}
+
+loki.source.journal "influxdb" {
+  matches = "_SYSTEMD_USER_UNIT=influxdb.service"
   forward_to = [loki.process.bridger_parsing.receiver]
   relabel_rules = loki.relabel.journal_labels.rules
 
@@ -63,6 +113,6 @@ loki.process "bridger_parsing" {
 
 loki.write "default" {
   endpoint {
-    url = "http://localhost:3100/loki/api/v1/push"
+    url = "http://loki:3100/loki/api/v1/push"
   }
 }
