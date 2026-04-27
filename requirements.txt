@@ -32,7 +32,7 @@ charset-normalizer==3.4.7
     # via requests
 coverage==7.13.5
     # via pytest-cov
-cryptography==46.0.7
+cryptography==47.0.0
     # via bridger (pyproject.toml)
 dataclasses-json==0.6.7
     # via bridger (pyproject.toml)
