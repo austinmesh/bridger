@@ -144,7 +144,7 @@ typing-extensions==4.15.0
     #   typing-inspect
 typing-inspect==0.9.0
     # via dataclasses-json
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   influxdb-client
     #   requests
