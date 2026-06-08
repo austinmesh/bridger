@@ -15,6 +15,67 @@ from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
 
+# Node ID length constants
+MESHTASTIC_NODE_ID_LENGTH = 8
+MESHCORE_NODE_ID_LENGTH = 64
+
+
+def is_valid_node_id(node_id: str) -> bool:
+    """Check if a node ID is valid (8-char meshtastic or 64-char meshcore hex)."""
+    # Remove leading ! if present
+    normalized = node_id.lstrip("!")
+
+    # Check length
+    if len(normalized) not in (MESHTASTIC_NODE_ID_LENGTH, MESHCORE_NODE_ID_LENGTH):
+        return False
+
+    # Check if it's valid hex
+    try:
+        int(normalized, 16)
+        return True
+    except ValueError:
+        return False
+
+
+def get_node_type(node_id: str) -> str:
+    """Get the type of node based on ID length. Returns 'meshtastic' or 'meshcore'."""
+    normalized = node_id.lstrip("!")
+    if len(normalized) == MESHTASTIC_NODE_ID_LENGTH:
+        return "meshtastic"
+    elif len(normalized) == MESHCORE_NODE_ID_LENGTH:
+        return "meshcore"
+    else:
+        raise ValueError(f"Invalid node ID length: {len(normalized)}")
+
+
+def check_valid_node_id(interaction: Interaction) -> bool:
+    """Discord check to validate node_id parameter is 8 or 64 character hex."""
+    node_id = None
+
+    if "options" in interaction.data:
+        for option in interaction.data["options"]:
+            if "options" in option:
+                for sub_option in option["options"]:
+                    if sub_option["name"] == "node_id":
+                        node_id = sub_option["value"]
+                        break
+            elif option.get("name") == "node_id":
+                node_id = option["value"]
+                break
+
+    if not node_id:
+        logger.warning("node_id not found in command options for validation")
+        return False
+
+    node_id = str(node_id)
+    if not is_valid_node_id(node_id):
+        logger.warning(f"Invalid node_id format: {node_id}")
+        raise app_commands.CheckFailure(
+            f"Invalid node ID: `{node_id}`. Must be an 8-character hex ID (Meshtastic) or 64-character hex ID (MeshCore)."
+        )
+
+    return True
+
 
 async def node_id_autocomplete(interaction: Interaction, current: str) -> List[app_commands.Choice[str]]:
     """Autocomplete function for node_id parameter."""
@@ -172,10 +233,11 @@ class GatewayPaginationView(ui.View):
         for gateway in page_gateways:
             owner = self.bot.get_user(gateway.owner_id)
             owner_name = owner.name if owner else "Unknown"
+            node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
 
             embed.add_field(
                 name="Gateway",
-                value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                value=f"ID: **{gateway.node_hex_id_without_bang}**\nType: **{node_type_label}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                 inline=False,
             )
 
@@ -238,14 +300,16 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                 f"Unknown error: {error}", ephemeral=True, delete_after=self.delete_after
             )
 
-    @app_commands.command(name="request-account", description="Request a new MQTT account")
-    @app_commands.describe(
-        node_id="The hex node ID to request an account for. With or without the preceding ! such as !cbaf0421 or cbaf0421"
-    )
-    @app_commands.autocomplete(node_id=node_id_autocomplete)
+    @app_commands.check(check_valid_node_id)
+    @app_commands.command(name="request-account", description="Request a new MQTT gateway account")
+    @app_commands.describe(node_id="Meshtastic node ID (8-char hex, e.g. cbaf0421) or MeshCore public key (64-char hex)")
     async def request_account(self, ctx: Interaction, node_id: str):
         gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
-        message = f"Gateway created for node **{gateway.node_hex_id_without_bang}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
+        node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
+        message = (
+            f"{node_type_label} gateway created for node **{gateway.node_hex_id_without_bang}**\n\n"
+            f"Username: **{gateway.user_string}**\nPassword: **{password}**"
+        )
 
         await ctx.response.send_message(message, ephemeral=True)
 
@@ -290,10 +354,11 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             for gateway in gateways:
                 owner = self.bot.get_user(gateway.owner_id)
                 owner_name = owner.name if owner else "Unknown"
+                node_type_label = "MeshCore" if gateway.node_type == "meshcore" else "Meshtastic"
 
                 embed.add_field(
                     name="Gateway",
-                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nType: **{node_type_label}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
                     inline=False,
                 )
 

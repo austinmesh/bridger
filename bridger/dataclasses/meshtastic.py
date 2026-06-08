@@ -1,40 +1,21 @@
-from abc import ABC
+"""Meshtastic-specific data point dataclasses."""
+
 from dataclasses import dataclass, field
 from typing import Optional
 
 from dataclasses_json import Undefined, config, dataclass_json
 
-
-class NodeMixin:
-    def _get_node_id(self) -> int:
-        if hasattr(self, "_from"):
-            return self._from
-        elif hasattr(self, "node_id"):
-            return self.node_id
-        else:
-            raise AttributeError("Object must have either '_from' or 'node_id' attribute")
-
-    @property
-    def node_hex_id_with_bang(self) -> str:
-        return f"!{self._get_node_id():08x}"
-
-    @property
-    def node_hex_id_without_bang(self) -> str:
-        return f"{self._get_node_id():08x}"
-
-    @property
-    def color(self) -> str:
-        return self.node_hex_id_without_bang[-6:]
-
-
-@dataclass
-class NodeData(NodeMixin):
-    node_id: int
+from bridger.dataclasses.base import MeshPacketPoint
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class TelemetryPoint(ABC):
+class TelemetryPoint(MeshPacketPoint):
+    """Base class for Meshtastic telemetry points.
+
+    ``rx_snr`` and ``rx_rssi`` are inherited from :class:`MeshPacketPoint`.
+    """
+
     def __post_init__(self):
         if self.__class__ == TelemetryPoint:
             raise TypeError("Cannot instantiate abstract class.")
@@ -43,8 +24,6 @@ class TelemetryPoint(ABC):
     to: int = field(metadata={"influx_kind": "tag"})
     packet_id: int = field(metadata=config(field_name="id", metadata={"influx_kind": "field"}))
     rx_time: int = field(metadata={"influx_kind": "field"})
-    rx_snr: float = field(metadata={"influx_kind": "field"})
-    rx_rssi: float = field(metadata={"influx_kind": "field"})
     hop_limit: int = field(metadata={"influx_kind": "field"})
     hop_start: int = field(metadata={"influx_kind": "field"})
     channel_id: str = field(metadata={"influx_kind": "tag"})
@@ -144,17 +123,3 @@ class TraceroutePoint(TelemetryPoint):
     snr_towards: Optional[int] = None
     route_back: Optional[int] = None
     snr_back: Optional[int] = None
-
-
-@dataclass_json(undefined=Undefined.EXCLUDE)
-@dataclass
-class AnnotationPoint:
-    measurement_name = "annotation"
-
-    node_id: str = field(metadata={"influx_kind": "tag"})
-    annotation_type: str = field(metadata={"influx_kind": "tag"})
-    body: str = field(metadata={"influx_kind": "field"})
-    author: str = field(metadata={"influx_kind": "tag"})
-    global_annotation: bool = field(default=False, metadata={"influx_kind": "tag"})
-    start_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
-    end_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
