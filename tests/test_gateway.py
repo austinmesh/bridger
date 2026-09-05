@@ -4,7 +4,14 @@ import pytest
 from discord import User
 from requests import HTTPError
 
-from bridger.gateway import GatewayData, GatewayError, GatewayManagerEMQX
+from bridger.gateway import (
+    GatewayAlreadyExistsError,
+    GatewayBackendError,
+    GatewayData,
+    GatewayError,
+    GatewayManagerEMQX,
+    GatewayValidationError,
+)
 
 # Sample data for mocking
 state_mock = MagicMock()
@@ -82,11 +89,11 @@ def test_create_gateway_user(gateway_manager, emqx_mock):
     )
 
 
-# Test create_gateway_user when user already exists
-def test_create_gateway_user_already_exists(gateway_manager, emqx_mock):
-    emqx_mock.create_user.side_effect = HTTPError("User already exists", response=MagicMock(status_code=400))
+# Test create_gateway_user when EMQX rejects the request as malformed
+def test_create_gateway_user_validation_error(gateway_manager, emqx_mock):
+    emqx_mock.create_user.side_effect = HTTPError("Bad request", response=MagicMock(status_code=400))
 
-    with pytest.raises(GatewayError):
+    with pytest.raises(GatewayValidationError):
         gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
 
 
@@ -301,3 +308,76 @@ def test_delete_gateway_user_removes_rules_before_user(gateway_manager, emqx_moc
 
     assert gateway_manager.delete_gateway_user("1a2b3c4d") is True
     assert calls == ["rules", "user"]
+
+
+def _http_error(status_code, body=None):
+    response = MagicMock(status_code=status_code)
+    response.json.return_value = body if body is not None else {}
+    return HTTPError(f"HTTP {status_code}", response=response)
+
+
+class TestCreateGatewayUserErrorMapping:
+    def test_conflict_maps_to_already_exists(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.side_effect = _http_error(409)
+
+        with pytest.raises(GatewayAlreadyExistsError) as e:
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        assert e.value.status_code == 409
+
+    def test_400_with_already_exists_code_maps_to_already_exists(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.side_effect = _http_error(400, {"code": "ALREADY_EXISTS"})
+
+        with pytest.raises(GatewayAlreadyExistsError):
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+    def test_server_error_maps_to_backend_error(self, gateway_manager, emqx_mock):
+        # Previously reported to the user as "Gateway already exists".
+        emqx_mock.create_user.side_effect = _http_error(500)
+
+        with pytest.raises(GatewayBackendError) as e:
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        assert e.value.status_code == 500
+
+    def test_unauthorized_maps_to_backend_error(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.side_effect = _http_error(401)
+
+        with pytest.raises(GatewayBackendError):
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+    def test_every_subclass_is_still_a_gateway_error(self, gateway_manager, emqx_mock):
+        # bridger.cli and its tests catch the base class.
+        emqx_mock.create_user.side_effect = _http_error(500)
+
+        with pytest.raises(GatewayError):
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+
+class TestCreateGatewayUserRollback:
+    def test_rolls_back_the_user_when_rules_fail(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.return_value = None
+        emqx_mock.create_user_authorization_rules_built_in_database.side_effect = _http_error(500)
+
+        with pytest.raises(GatewayBackendError):
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        emqx_mock.delete_user.assert_called_once_with(gateway_manager.authentication_id, "1234567890-1a2b3c4d")
+
+    def test_still_raises_when_the_rollback_also_fails(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.return_value = None
+        emqx_mock.create_user_authorization_rules_built_in_database.side_effect = _http_error(500)
+        emqx_mock.delete_user.side_effect = RuntimeError("emqx unreachable")
+
+        with pytest.raises(GatewayBackendError):
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+    def test_no_rollback_on_success(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.return_value = None
+        emqx_mock.create_user_authorization_rules_built_in_database.return_value = None
+
+        gateway, password = gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        assert gateway.user_string == "1234567890-1a2b3c4d"
+        assert len(password) == 10
+        emqx_mock.delete_user.assert_not_called()
