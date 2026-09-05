@@ -1,16 +1,18 @@
 apiVersion: 1
 datasources:
   - name: loki
+    uid: loki
     type: loki
     editable: true
     url: http://loki:3100
   - name: influxdb
+    uid: influxdb
     type: influxdb
     url: http://influxdb:8086
     jsonData:
       version: Flux
       organization: $INFLUXDB_V2_ORG
-      defaultBucket: $INFLUXDB_V2_bucket
+      defaultBucket: $INFLUXDB_V2_BUCKET
       tlsSkipVerify: false
     secureJsonData:
       token: $INFLUXDB_V2_TOKEN
