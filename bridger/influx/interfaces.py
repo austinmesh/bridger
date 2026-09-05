@@ -4,12 +4,26 @@ from textwrap import dedent
 from typing import Optional, Union
 
 from influxdb_client import InfluxDBClient
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.client.write_api import SYNCHRONOUS, WriteOptions
 from influxdb_client.rest import ApiException
 
 from bridger.config import INFLUXDB_V2_BUCKET, INFLUXDB_V2_WRITE_PRECISION
 from bridger.dataclasses import TelemetryPoint
 from bridger.log import logger
+
+# Used by the MQTT bridge only. on_message runs on paho's network thread, so a synchronous
+# HTTP round trip per point would block packet handling -- and with per-gateway deduplication
+# there are several times more points than before. flush_interval bounds worst-case loss on a
+# hard kill to two seconds of packets.
+BRIDGE_WRITE_OPTIONS = WriteOptions(
+    batch_size=200,
+    flush_interval=2_000,
+    jitter_interval=200,
+    retry_interval=5_000,
+    max_retries=5,
+    max_retry_delay=30_000,
+    exponential_base=2,
+)
 
 
 class InfluxReader:
@@ -131,8 +145,38 @@ class InfluxReader:
 
 
 class InfluxWriter:
-    def __init__(self, influx_client: InfluxDBClient):
-        self.write_api = influx_client.write_api(write_options=SYNCHRONOUS)
+    def __init__(self, influx_client: InfluxDBClient, write_options=SYNCHRONOUS):
+        # SYNCHRONOUS by default so callers that depend on write failures raising -- the
+        # annotation command, and the tests -- are unaffected. Only the bridge opts into
+        # batching, where failures surface through the callbacks instead.
+        self.batching = write_options is not SYNCHRONOUS
+        self.write_api = influx_client.write_api(
+            write_options=write_options,
+            error_callback=self._on_write_error,
+            success_callback=self._on_write_success,
+            retry_callback=self._on_write_retry,
+        )
+
+    @staticmethod
+    def _on_write_error(conf, data, exception):
+        # The callback receives serialized line protocol rather than the dataclass, so the
+        # rich context available on the synchronous path is not available here.
+        if isinstance(exception, ApiException) and exception.status == 401:
+            logger.bind(conf=conf).error(f"Credentials for InfluxDB are either not set or incorrect: {exception}")
+        else:
+            logger.bind(conf=conf, data=str(data)[:500]).error(f"Failed to write batch to InfluxDB: {exception}")
+
+    @staticmethod
+    def _on_write_success(conf, data):
+        logger.bind(conf=conf).debug("Wrote batch to InfluxDB")
+
+    @staticmethod
+    def _on_write_retry(conf, data, exception):
+        logger.bind(conf=conf).warning(f"Retrying InfluxDB write: {exception}")
+
+    def close(self):
+        """Flush and dispose. Pending batches are lost if this is skipped."""
+        self.write_api.close()
 
     def write_data(self, record, measurement, fields, tags):
         try:
@@ -152,13 +196,16 @@ class InfluxWriter:
                 write_precision=INFLUXDB_V2_WRITE_PRECISION,
             )
 
+            verb = "Queued" if self.batching else "Wrote"
+
             if isinstance(record, list):
                 logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {len(record)} {measurement} packets from gateway: <green>{record[0].gateway_id}</green>"
+                    f"{verb} {len(record)} {measurement} packets from gateway: <green>{record[0].gateway_id}</green>"
                 )
             else:
                 logger.bind(**extra).opt(colors=True).info(
-                    f"Wrote {measurement} packet <yellow>{record.packet_id}</yellow> from gateway: <green>{record.gateway_id}</green>"  # noqa: E501
+                    f"{verb} {measurement} packet <yellow>{record.packet_id}</yellow> "
+                    f"from gateway: <green>{record.gateway_id}</green>"
                 )
         except ApiException as e:
             if e.status == 401:

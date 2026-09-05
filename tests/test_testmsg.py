@@ -56,7 +56,8 @@ class TestTestMsgCog:
     def test_init_creates_deduplicator(self, testmsg_cog):
         assert hasattr(testmsg_cog, "deduplicator")
         assert isinstance(testmsg_cog.deduplicator, PacketDeduplicator)
-        assert testmsg_cog.deduplicator.message_queue.maxlen == 100
+        assert testmsg_cog.deduplicator.maxlen == 2000
+        assert testmsg_cog.deduplicator.ttl == 3600
 
     def test_deduplicator_processes_unique_message(self, testmsg_cog, mock_service_envelope):
         assert testmsg_cog.deduplicator.should_process(mock_service_envelope)

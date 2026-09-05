@@ -8,7 +8,7 @@ from sentry_sdk import add_breadcrumb, set_user
 
 from bridger.config import MQTT_TOPIC
 from bridger.deduplication import PacketDeduplicator
-from bridger.influx.interfaces import InfluxWriter
+from bridger.influx.interfaces import BRIDGE_WRITE_OPTIONS, InfluxWriter
 from bridger.log import logger
 from bridger.mesh import PacketProcessorError, PBPacketProcessor
 from bridger.utils import should_ignore_pki_message
@@ -18,23 +18,47 @@ class BridgerMQTT(Client):
     def __init__(self, influx_client: InfluxDBClient, *args, **kwargs):
         self.influx_client = influx_client  # Before super().__init__ call so it isn't passed to the parent class
         super().__init__(*args, **kwargs)
-        self.deduplicator = PacketDeduplicator(maxlen=100)
+        # Scoped by gateway: rx_snr, rx_rssi and the hop counts are per-gateway measurements,
+        # and gateway_id is a tag, so collapsing on packet id alone threw away every reception
+        # after the first to arrive.
+        self.deduplicator = PacketDeduplicator(use_gateway_id=True)
+        # One writer for the process. A new WriteApi per message meant a fresh batching
+        # pipeline per message, and rebuilding it defeats batching entirely.
+        self.influx_writer = InfluxWriter(influx_client, write_options=BRIDGE_WRITE_OPTIONS)
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
         if reason_code != 0:
             logger.error(f"Connection failed with code: {reason_code}. Attempting to reconnect...")
             return
 
+        # This result is paho's local error code, not the broker's. A broker that denies the
+        # subscription still returns success here, which is why on_subscribe exists below.
         subscription = self.subscribe(MQTT_TOPIC)
         if subscription[0] != 0:
             logger.error(f"Failed to subscribe to topic: {MQTT_TOPIC}")
             return
 
-        logger.info(f"Connected and subscribed to topic: {MQTT_TOPIC}")
+        logger.info(f"Requested subscription to topic: {MQTT_TOPIC}")
+
+    def on_subscribe(self, client, userdata, mid, reason_code_list, properties):
+        """Report the broker's SUBACK.
+
+        Without this a denied subscription looks identical to a healthy one: the bridge logs
+        that it subscribed and then silently receives nothing at all.
+        """
+        for reason_code in reason_code_list:
+            if getattr(reason_code, "is_failure", False):
+                logger.error(f"Broker refused subscription to {MQTT_TOPIC}: {reason_code}. No packets will arrive.")
+            else:
+                logger.info(f"Subscribed to {MQTT_TOPIC} with QoS {reason_code.value}")
 
     def on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         if reason_code == 0:
             logger.info("Disconnected")
+
+    def close(self):
+        """Flush pending writes. Batched points are lost otherwise."""
+        self.influx_writer.close()
 
     def on_message(self, client, userdata, message):
         message_payload = base64.b64encode(message.payload)
@@ -58,14 +82,13 @@ class BridgerMQTT(Client):
 
             packet_id = service_envelope.packet.id
             pb_processor = PBPacketProcessor(service_envelope)
-            influx_writer = InfluxWriter(self.influx_client)
             set_user({"id": getattr(service_envelope.packet, "from")})
 
             data = pb_processor.data
 
             if data:
                 logger.bind(envelope_id=packet_id).debug(f"Trying to write data: {data}")
-                influx_writer.write_point(data)
+                self.influx_writer.write_point(data)
             else:
                 logger.bind(envelope_id=packet_id).debug("No data to write")
 
