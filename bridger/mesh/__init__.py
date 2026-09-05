@@ -1,5 +1,6 @@
 import base64
 from abc import ABC, abstractmethod
+from functools import cached_property
 from typing import Optional, Union
 
 from google.protobuf.json_format import MessageToDict
@@ -54,7 +55,7 @@ class PBPacketProcessor(PacketProcessor):
         if auto_decrypt and self.encrypted:
             self.decrypt()
 
-    @property
+    @cached_property
     def payload_dict(self):
         if isinstance(self.payload, str):
             return {"text": self.payload}
@@ -67,7 +68,7 @@ class PBPacketProcessor(PacketProcessor):
                 use_integers_for_enums=True,
             )
 
-    @property
+    @property  # not cached: reads packet.decoded, which decrypt() replaces
     def portnum(self):
         return self.service_envelope.packet.decoded.portnum
 
@@ -79,7 +80,7 @@ class PBPacketProcessor(PacketProcessor):
     def portnum_friendly_name(self) -> Optional[str]:
         return getattr(self.portnum_protocol, "name", None)
 
-    @property
+    @cached_property
     def payload(self) -> Union[Message, str, bytes]:
         if self.portnum in HANDLER_MAP:
             payload = self.service_envelope.packet.decoded.payload
@@ -122,6 +123,8 @@ class PBPacketProcessor(PacketProcessor):
             "gateway_id": self.service_envelope.gateway_id,
         }
 
+        # payload_dict is cached and shallow-copied here, so handlers must treat nested
+        # payload values as read-only.
         point_data.update(self.payload_dict)
         logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 

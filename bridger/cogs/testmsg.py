@@ -49,7 +49,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel_id = discord_channel_id
         self.discord_channel = None
         self.influx_reader = influx_reader
-        self.deduplicator = PacketDeduplicator(maxlen=100, use_gateway_id=True)
+        # The 1h TTL matches the embed-tracking queue below, so a packet re-heard while its
+        # Discord message is still being updated is still recognised as a duplicate.
+        self.deduplicator = PacketDeduplicator(maxlen=2000, use_gateway_id=True, ttl=3600)
         # Per instance rather than a class attribute, so it does not leak between tests.
         self.node_info_cache = TTLCache(NODE_INFO_CACHE_TTL, name="node-info")
         self._mqtt_task = None
@@ -202,7 +204,14 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             password=MQTT_PASS,
             clean_session=True,
         ) as client:
-            await client.subscribe(full_topic)
+            reason_codes = await client.subscribe(full_topic)
+
+            # A refused subscription otherwise looks exactly like a healthy one: connected,
+            # and then no messages ever arrive.
+            for reason_code in reason_codes or []:
+                if getattr(reason_code, "is_failure", False):
+                    raise aiomqtt.MqttError(f"Broker refused subscription to {full_topic}: {reason_code}")
+
             logger.info(f"Subscribed to {full_topic}")
             await logger.complete()
 

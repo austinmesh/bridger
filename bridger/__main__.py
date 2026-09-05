@@ -1,3 +1,5 @@
+import signal
+
 from paho.mqtt.client import MQTT_ERR_SUCCESS, CallbackAPIVersion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -28,8 +30,31 @@ def connect_to_mqtt(influx_client):
     return client
 
 
+def handle_sigterm(signum, frame):
+    """Turn SIGTERM into KeyboardInterrupt so the shutdown path below runs.
+
+    Containers are stopped with SIGTERM, not SIGINT. Without this the process dies where it
+    stands and whatever is sitting in the write batch is lost on every restart.
+    """
+    logger.info("Received SIGTERM, shutting down...")
+    raise KeyboardInterrupt
+
+
+def shutdown(client, influx_client):
+    if client:
+        client.disconnect()
+        client.loop_stop()
+        client.close()  # flushes pending batches
+
+    if influx_client:
+        influx_client.close()
+
+
 if __name__ == "__main__":
     client = None
+    influx_client = None
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
 
     try:
         influx_client = create_influx_client("bridger")
@@ -38,12 +63,8 @@ if __name__ == "__main__":
         client.reconnect_delay_set(min_delay=5, max_delay=120)
         client.loop_forever(retry_first_connection=True)
     except KeyboardInterrupt:
-        logger.info("Received KeyboardInterrupt, shutting down...")
-        if client:
-            client.disconnect()
-            client.loop_stop()
+        logger.info("Shutting down...")
     except Exception as e:
         logger.error(f"Application error: {e}")
-        if client:
-            client.disconnect()
-            client.loop_stop()
+    finally:
+        shutdown(client, influx_client)
