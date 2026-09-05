@@ -9,3 +9,10 @@ INFLUXDB_V2_BUCKET = os.getenv("INFLUXDB_V2_BUCKET", "meshtastic")
 INFLUXDB_V2_WRITE_PRECISION = os.getenv("INFLUXDB_V2_WRITE_PRECISION", "s")  # s, ms, us, or ns
 MESHTASTIC_API_ENDPOINT = "https://api.meshtastic.org"
 MESHTASTIC_API_CACHE_TTL = int(os.getenv("MESHTASTIC_API_CACHE_TTL", 3600 * 6))  # Default to 6 hours if not set
+MESHTASTIC_API_TIMEOUT = float(os.getenv("MESHTASTIC_API_TIMEOUT", 10))
+
+# Without a timeout, a hung EMQX hangs the Discord bot indefinitely rather than failing
+# one command. 3.05s connect is the requests convention: just over the TCP retransmit window.
+EMQX_HTTP_CONNECT_TIMEOUT = float(os.getenv("EMQX_HTTP_CONNECT_TIMEOUT", 3.05))
+EMQX_HTTP_READ_TIMEOUT = float(os.getenv("EMQX_HTTP_READ_TIMEOUT", 10))
+EMQX_HTTP_TIMEOUT = (EMQX_HTTP_CONNECT_TIMEOUT, EMQX_HTTP_READ_TIMEOUT)

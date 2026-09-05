@@ -1,13 +1,15 @@
+import asyncio
 import os
 import re
 import time
 from datetime import UTC, datetime
 from typing import Literal, Optional
 
-from discord import ButtonStyle, Embed, Interaction, app_commands, ui
-from discord.ext import commands
+from discord import ButtonStyle, Embed, Interaction, Member, app_commands, ui
+from discord.ext import commands, tasks
 from discord.utils import get
 
+from bridger.cogs.cache import TTLCache
 from bridger.dataclasses import AnnotationPoint
 from bridger.gateway import (
     GatewayAlreadyExistsError,
@@ -21,137 +23,148 @@ from bridger.log import logger
 
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
 
+# The node list TTL is deliberately twice the refresh interval, so one failed background
+# refresh never empties the cache and drops users back onto the blocking path.
+NODE_CACHE_TTL = int(os.getenv("BRIDGER_NODE_CACHE_TTL", 600))
+NODE_CACHE_REFRESH_SECONDS = int(os.getenv("BRIDGER_NODE_CACHE_REFRESH", 300))
+GATEWAY_CACHE_TTL = int(os.getenv("BRIDGER_GATEWAY_CACHE_TTL", 30))
+AUTOCOMPLETE_DEADLINE = float(os.getenv("BRIDGER_AUTOCOMPLETE_DEADLINE", 2.0))
+
+NODE_CACHE_KEY = "all"
+GATEWAY_CACHE_KEY = "all"
+
+node_cache = TTLCache(NODE_CACHE_TTL, name="node-ids")
+gateway_cache = TTLCache(GATEWAY_CACHE_TTL, name="gateways")
+
 
 async def node_id_autocomplete(interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
-    """Autocomplete function for node_id parameter."""
+    """Autocomplete for the node_id parameter.
+
+    Fires per keystroke against Discord's ~3s deadline, so the 30-day Flux query behind it is
+    cached and run on a worker thread, and we give up early rather than let the interaction
+    time out with nothing.
+    """
     try:
-        logger.debug(f"Autocomplete called with current='{current}'")
-
-        # Get all known node IDs with display names from InfluxDB
         influx_reader = InfluxReader(interaction.client.influx_client)
-        nodes = influx_reader.get_all_node_ids()
-        logger.debug(f"Found {len(nodes)} nodes from InfluxDB")
-
-        # Filter based on what user has typed so far
-        if current:
-            # Remove leading ! if present for filtering
-            current_clean = current.lstrip("!").lower()
-            filtered_nodes = [
-                node for node in nodes if (current_clean in node["value"].lower() or current_clean in node["name"].lower())
-            ]
-            logger.debug(f"Filtered to {len(filtered_nodes)} nodes matching '{current_clean}'")
-        else:
-            filtered_nodes = nodes[:25]  # Limit even when no filter
-            logger.debug(f"No filter provided, showing first {len(filtered_nodes)} nodes")
-
-        # Limit to 25 choices (Discord limit)
-        choices = []
-        for node in filtered_nodes[:25]:
-            # Use the name for display and value for the actual parameter
-            choices.append(app_commands.Choice(name=node["name"], value=node["value"]))
-
-        logger.debug(f"Returning {len(choices)} choices for autocomplete")
-        return choices
+        nodes = await asyncio.wait_for(
+            node_cache.get_or_load(NODE_CACHE_KEY, influx_reader.get_all_node_ids),
+            timeout=AUTOCOMPLETE_DEADLINE,
+        )
+    except TimeoutError:
+        logger.warning("Autocomplete timed out waiting for the node list")
+        return []
     except Exception as e:
         logger.error(f"Error in node_id autocomplete: {e}")
-        # Return empty list on error rather than None to avoid Discord API errors
+        # An empty list rather than None, which the Discord API rejects.
         return []
 
+    if current:
+        needle = current.lstrip("!").lower()
+        nodes = [node for node in nodes if needle in node["value"].lower() or needle in (node["name"] or "").lower()]
 
-def check_gateway_owner(interaction: Interaction) -> bool:
-    """Check if the user owns the gateway specified in the node_id parameter."""
-    node_id = None
+    # Discord rejects a choice with no name, and the query can yield one when a node has
+    # never reported a short or long name.
+    return [app_commands.Choice(name=node["name"] or node["value"], value=node["value"]) for node in nodes[:25]]
 
-    logger.debug(f"Interaction data: {interaction.data}")
 
-    # Extract node_id from interaction options
-    if "options" in interaction.data:
-        for option in interaction.data["options"]:
-            if "options" in option:
-                for sub_option in option["options"]:
-                    if sub_option["name"] == "node_id":
-                        node_id = sub_option["value"]
-                        break
-            # Also check direct options (not nested)
-            elif option.get("name") == "node_id":
-                node_id = option["value"]
-                break
+def extract_node_id(interaction: Interaction) -> Optional[str]:
+    """Pull the node_id argument out of an interaction.
+
+    discord.py fills in interaction.namespace before checks run, so prefer that and fall back
+    to walking the raw payload.
+    """
+    node_id = getattr(interaction.namespace, "node_id", None)
+    if node_id:
+        return str(node_id)
+
+    for option in (interaction.data or {}).get("options", []):
+        if option.get("name") == "node_id":
+            return str(option["value"])
+
+        for sub_option in option.get("options", []):
+            if sub_option.get("name") == "node_id":
+                return str(sub_option["value"])
+
+    return None
+
+
+async def list_gateways_cached(gateway_manager: GatewayManagerEMQX):
+    return await gateway_cache.get_or_load(GATEWAY_CACHE_KEY, gateway_manager.list_gateways)
+
+
+async def check_gateway_owner(interaction: Interaction) -> bool:
+    """Check whether the caller owns the gateway named in the node_id parameter."""
+    node_id = extract_node_id(interaction)
 
     if not node_id:
+        # Returning False rather than raising: a non-AppCommandError raised from a check
+        # escapes the command tree as an unhandled task, and the user just sees
+        # "the application did not respond".
         logger.warning("node_id not found in command options")
-        raise ValueError("node_id not found in the command options")
+        return False
 
-    # Normalize node_id (remove leading !)
     normalized_node_id = node_id.lstrip("!")
-    logger.debug(f"Checking ownership for node ID: {normalized_node_id}")
 
     try:
-        gateway_manager = GatewayManagerEMQX(emqx)
-        gateway = gateway_manager.get_gateway(normalized_node_id)
-        owner = interaction.client.get_user(gateway.owner_id)
-
-        if not owner:
-            logger.warning(f"Could not find owner user with ID {gateway.owner_id}")
-            return False
-
-        is_owner = owner == interaction.user
-        logger.debug(f"User {interaction.user} is owner: {is_owner}")
-        return is_owner
-
-    except ValueError as e:
-        logger.warning(f"Gateway not found for node {normalized_node_id}: {e}")
-        # Don't raise here - let the calling command handle the error
+        gateways = await list_gateways_cached(GatewayManagerEMQX(emqx))
+        node_id_int = int(normalized_node_id, 16)
+    except ValueError:
+        logger.warning(f"Not a valid node ID: {normalized_node_id}")
         return False
     except Exception as e:
         logger.error(f"Unexpected error checking gateway ownership: {e}")
         return False
 
+    for gateway in gateways:
+        if gateway.node_id == node_id_int:
+            # Compare ids directly. get_user() is cache-only and returns None for a user who
+            # is not in the local cache, which denied legitimate owners.
+            return gateway.owner_id == interaction.user.id
+
+    logger.warning(f"Gateway not found for node {normalized_node_id}")
+    return False
+
 
 def is_bridger_admin(interaction: Interaction) -> bool:
-    """Check if user has the Bridger admin role."""
-    bridger_admin_role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
-    has_admin_role = bridger_admin_role and bridger_admin_role in interaction.user.roles
-    logger.debug(f"User {interaction.user} has admin role: {has_admin_role}")
-    return has_admin_role
+    """Check whether the caller holds the Bridger admin role."""
+    # guild is None in DMs, and roles only exists on Member, not User.
+    if interaction.guild is None or not isinstance(interaction.user, Member):
+        return False
+
+    role = get(interaction.guild.roles, name=BRIDGER_ADMIN_ROLE)
+    return role is not None and role in interaction.user.roles
 
 
-def check_any_gateway_ownership(interaction: Interaction) -> bool:
-    """Check if user owns any gateway."""
+async def check_any_gateway_ownership(interaction: Interaction) -> bool:
+    """Check whether the caller owns any gateway at all."""
     try:
-        gateway_manager = GatewayManagerEMQX(emqx)
-        all_gateways = gateway_manager.list_gateways()
-        user_owns_gateway = any(gateway.owner_id == interaction.user.id for gateway in all_gateways)
-        logger.debug(f"User {interaction.user} owns any gateway: {user_owns_gateway}")
-        return user_owns_gateway
+        gateways = await list_gateways_cached(GatewayManagerEMQX(emqx))
     except Exception as e:
         logger.warning(f"Error checking if user owns any gateway: {e}")
         return False
 
-
-def is_bridger_admin_or_owner(interaction: Interaction) -> bool:
-    """Check if user is either a Bridger admin or owns the gateway in question."""
-    # Check admin role first (more efficient)
-    if is_bridger_admin(interaction):
-        return True
-
-    # If not admin, check if they own the specific gateway
-    try:
-        is_owner = check_gateway_owner(interaction)
-        logger.debug(f"User {interaction.user} gateway ownership check: {is_owner}")
-        return is_owner
-    except Exception as e:
-        logger.warning(f"Error checking gateway ownership: {e}")
-        return False
+    return any(gateway.owner_id == interaction.user.id for gateway in gateways)
 
 
-def is_bridger_admin_or_gateway_owner(interaction: Interaction) -> bool:
-    """Check if user is either a Bridger admin or owns any gateway."""
-    # Check admin role first (more efficient)
-    if is_bridger_admin(interaction):
-        return True
+async def is_bridger_admin_or_owner(interaction: Interaction) -> bool:
+    """Admin, or the owner of the gateway in question."""
+    return is_bridger_admin(interaction) or await check_gateway_owner(interaction)
 
-    # If not admin, check if they own any gateway
-    return check_any_gateway_ownership(interaction)
+
+async def is_bridger_admin_or_gateway_owner(interaction: Interaction) -> bool:
+    """Admin, or the owner of any gateway."""
+    return is_bridger_admin(interaction) or await check_any_gateway_ownership(interaction)
+
+
+def format_owner(bot, owner_id: int) -> str:
+    """Render a gateway owner for display.
+
+    Deliberately cache-only: list_accounts renders up to 25 gateways per page, so fetch_user
+    would be 25 REST calls inside a 3s window. A mention resolves client-side for free when
+    the user is not cached.
+    """
+    owner = bot.get_user(owner_id)
+    return owner.name if owner else f"<@{owner_id}>"
 
 
 class GatewayPaginationView(ui.View):
@@ -160,7 +173,7 @@ class GatewayPaginationView(ui.View):
         self.gateways = gateways
         self.bot = bot
         self.current_page = 0
-        self.max_page = (len(gateways) - 1) // 25  # 25 fields per page
+        self.max_page = max(0, (len(gateways) - 1) // 25)  # 25 fields per page
 
         self.update_buttons()
 
@@ -176,8 +189,7 @@ class GatewayPaginationView(ui.View):
         embed = Embed(description="Currently provisioned gateways:", color=0x6CEB94)
 
         for gateway in page_gateways:
-            owner = self.bot.get_user(gateway.owner_id)
-            owner_name = owner.name if owner else "Unknown"
+            owner_name = format_owner(self.bot, gateway.owner_id)
 
             embed.add_field(
                 name="Gateway",
@@ -214,6 +226,7 @@ class GatewayPaginationView(ui.View):
             item.disabled = True
 
 
+@app_commands.guild_only()
 class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     delete_after = None
 
@@ -221,6 +234,40 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         self.bot = bot
         self.gateway_manager = gateway_manager
         self.influx_reader = influx_reader
+
+    async def cog_load(self):
+        self.refresh_caches.start()
+
+    async def cog_unload(self):
+        self.refresh_caches.cancel()
+
+    @tasks.loop(seconds=NODE_CACHE_REFRESH_SECONDS)
+    async def refresh_caches(self):
+        """Keep the caches warm.
+
+        Checks run before a command body and cannot defer, so the gateway list has to be a
+        cache hit or it eats the interaction's 3s budget.
+        """
+        try:
+            await node_cache.refresh(NODE_CACHE_KEY, self.influx_reader.get_all_node_ids)
+            await gateway_cache.refresh(GATEWAY_CACHE_KEY, self.gateway_manager.list_gateways)
+        except Exception:
+            logger.exception("Cache refresh failed, serving stale entries")
+
+    @refresh_caches.before_loop
+    async def _before_refresh_caches(self):
+        await self.bot.wait_until_ready()
+
+    async def reply(self, interaction: Interaction, content: str, **kwargs):
+        """Reply to an interaction whether or not it has already been deferred.
+
+        Note delete_after is not a Webhook.send parameter, so it is dropped on the followup
+        path rather than raising.
+        """
+        if interaction.response.is_done():
+            await interaction.followup.send(content, ephemeral=True, **kwargs)
+        else:
+            await interaction.response.send_message(content, ephemeral=True, delete_after=self.delete_after, **kwargs)
 
     @staticmethod
     def _describe_gateway_error(error: GatewayError) -> str:
@@ -239,7 +286,6 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         return f"Gateway backend error for {node_id}{status}. Please try again later or contact an admin."
 
     async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError):
-        # Log the type of error and error message
         logger.debug(f"App command error: {type(error)}: {error}")
 
         if isinstance(error, app_commands.errors.CommandInvokeError):
@@ -247,26 +293,16 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                 logger.opt(exception=error.original).warning(
                     f"Gateway command failed for node {error.original.gateway.node_hex_id_without_bang}"
                 )
-                await interaction.response.send_message(
-                    self._describe_gateway_error(error.original),
-                    ephemeral=True,
-                    delete_after=self.delete_after,
-                )
+                message = self._describe_gateway_error(error.original)
             else:
                 logger.opt(exception=error.original).warning("Command invoke error")
-                await interaction.response.send_message(
-                    f"Command invoke error: {error.original}", ephemeral=True, delete_after=self.delete_after
-                )
+                message = f"Command invoke error: {error.original}"
         elif isinstance(error, (app_commands.errors.MissingRole, app_commands.errors.CheckFailure)):
-            await interaction.response.send_message(
-                f"Check failure: {error}", ephemeral=True, delete_after=self.delete_after
-            )
-        elif isinstance(error, ValueError):
-            await interaction.response.send_message(f"Value error: {error}", ephemeral=True, delete_after=self.delete_after)
+            message = f"Check failure: {error}"
         else:
-            await interaction.response.send_message(
-                f"Unknown error: {error}", ephemeral=True, delete_after=self.delete_after
-            )
+            message = f"Unknown error: {error}"
+
+        await self.reply(interaction, message)
 
     @app_commands.command(name="request-account", description="Request a new MQTT account")
     @app_commands.describe(
@@ -274,28 +310,41 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     )
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def request_account(self, ctx: Interaction, node_id: str):
-        gateway, password = self.gateway_manager.create_gateway_user(node_id, ctx.user)
-        message = f"Gateway created for node **{gateway.node_hex_id_without_bang}**\n\nUsername: **{gateway.user_string}**\nPassword: **{password}**"  # noqa: E501
+        await ctx.response.defer(ephemeral=True)
 
-        await ctx.response.send_message(message, ephemeral=True)
+        gateway, password = await asyncio.to_thread(self.gateway_manager.create_gateway_user, node_id, ctx.user)
+        await gateway_cache.invalidate()
+
+        logger.bind(actor=ctx.user.id, node_id=gateway.node_hex_id_without_bang).info("Gateway account created")
+
+        await self.reply(
+            ctx,
+            f"Gateway created for node **{gateway.node_hex_id_without_bang}**\n\n"
+            f"Username: **{gateway.user_string}**\nPassword: **{password}**",
+        )
 
     @app_commands.check(is_bridger_admin_or_owner)
     @app_commands.command(name="delete-account", description="Delete MQTT account")
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def delete_account(self, ctx: Interaction, node_id: str):
-        if self.gateway_manager.delete_gateway_user(node_id):
-            await ctx.response.send_message(f"Gateway deleted: {node_id}", ephemeral=True, delete_after=self.delete_after)
+        await ctx.response.defer(ephemeral=True)
+
+        deleted = await asyncio.to_thread(self.gateway_manager.delete_gateway_user, node_id)
+        await gateway_cache.invalidate()
+
+        if deleted:
+            logger.bind(actor=ctx.user.id, node_id=node_id).info("Gateway account deleted")
+            await self.reply(ctx, f"Gateway deleted: {node_id}")
         else:
-            await ctx.response.send_message(f"Gateway not found: {node_id}", ephemeral=True, delete_after=self.delete_after)
+            await self.reply(ctx, f"Gateway not found: {node_id}")
 
     @app_commands.check(is_bridger_admin_or_gateway_owner)
     @app_commands.command(name="list-accounts", description="List MQTT accounts (all if admin, your own if owner)")
     async def list_accounts(self, ctx: Interaction):
-        # Check if user is a Bridger Admin
-        is_admin = is_bridger_admin(ctx)
+        await ctx.response.defer(ephemeral=True)
 
-        # Get all gateways
-        all_gateways = self.gateway_manager.list_gateways()
+        is_admin = is_bridger_admin(ctx)
+        all_gateways = await list_gateways_cached(self.gateway_manager)
 
         if is_admin:
             # Admin sees all gateways
@@ -308,9 +357,9 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         if not gateways:
             if is_admin:
-                await ctx.response.send_message(content="There are no provisioned gateways in the system.", ephemeral=True)
+                await self.reply(ctx, "There are no provisioned gateways in the system.")
             else:
-                await ctx.response.send_message(content="You don't own any provisioned gateways.", ephemeral=True)
+                await self.reply(ctx, "You don't own any provisioned gateways.")
             return
 
         if len(gateways) <= 25:
@@ -318,8 +367,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             embed = Embed(description=f"Currently provisioned gateways ({list_type}):", color=0x6CEB94)
 
             for gateway in gateways:
-                owner = self.bot.get_user(gateway.owner_id)
-                owner_name = owner.name if owner else "Unknown"
+                owner_name = format_owner(self.bot, gateway.owner_id)
 
                 embed.add_field(
                     name="Gateway",
@@ -331,53 +379,53 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
                     inline=False,
                 )
 
-            await ctx.response.send_message(
-                content=f"There are {len(gateways)} {list_type} in the system.",
-                embed=embed,
-                ephemeral=True,
-            )
+            await self.reply(ctx, f"There are {len(gateways)} {list_type} in the system.", embed=embed)
         else:
             # Use pagination for more than 25 gateways
             view = GatewayPaginationView(gateways, self.bot)
             embed = view.get_page_embed()
 
-            await ctx.response.send_message(
-                content=f"There are {len(gateways)} {list_type} in the system.",
-                embed=embed,
-                view=view,
-                ephemeral=True,
-            )
+            await self.reply(ctx, f"There are {len(gateways)} {list_type} in the system.", embed=embed, view=view)
 
     @app_commands.check(check_gateway_owner)
     @app_commands.command(name="reset-password", description="Reset MQTT account password")
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def reset_password(self, ctx: Interaction, node_id: str):
-        gateway, password = self.gateway_manager.reset_gateway_password(node_id)
+        await ctx.response.defer(ephemeral=True)
 
-        await ctx.response.send_message(
-            f"Gateway **{gateway.node_hex_id_without_bang}** password reset. The username is **{gateway.user_string}** with new password: `{password}`",  # noqa: E501
-            ephemeral=True,
+        gateway, password = await asyncio.to_thread(self.gateway_manager.reset_gateway_password, node_id)
+
+        logger.bind(actor=ctx.user.id, node_id=gateway.node_hex_id_without_bang).info("Gateway password reset")
+
+        await self.reply(
+            ctx,
+            f"Gateway **{gateway.node_hex_id_without_bang}** password reset. "
+            f"The username is **{gateway.user_string}** with new password: `{password}`",
         )
 
     @app_commands.command(name="is-alive", description="Check if MQTT gateway is alive and receiving packets")
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def is_alive(self, ctx: Interaction, node_id: str):
-        gateway = self.gateway_manager.get_gateway(node_id)
-        tables = self.influx_reader.get_recent_packets(gateway.node_hex_id_with_bang)
+        await ctx.response.defer(ephemeral=True)
+
+        gateway = await asyncio.to_thread(self.gateway_manager.get_gateway, node_id)
+        tables = await asyncio.to_thread(self.influx_reader.get_recent_packets, gateway.node_hex_id_with_bang)
 
         if not tables:
-            await ctx.response.send_message(
+            await self.reply(
+                ctx,
                 f"We haven't received any packets from **{gateway.node_hex_id_without_bang}** in the last hour",
-                ephemeral=True,
             )
         else:
             records = tables[0].records
             record = max(records, key=lambda r: r.values.get("_time"))
             packet_time = int(record.values.get("_time").timestamp())
 
-            await ctx.response.send_message(
-                f"Gateway **{gateway.node_hex_id_without_bang}** is alive. We have received **{len(records)}** packets in the last hour. The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",  # noqa: E501
-                ephemeral=True,
+            await self.reply(
+                ctx,
+                f"Gateway **{gateway.node_hex_id_without_bang}** is alive. "
+                f"We have received **{len(records)}** packets in the last hour. "
+                f"The most recent was received at <t:{packet_time}> (<t:{packet_time}:R>)",
             )
 
     @app_commands.check(is_bridger_admin_or_owner)
@@ -410,7 +458,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         start_time: Optional[str] = None,
         end_time: Optional[str] = None,
     ):
-        # Normalize node_id to hex format without !
+        await ctx.response.defer(ephemeral=True)
+
         normalized_node_id = node_id.lstrip("!")
 
         # Parse time parameters
@@ -420,32 +469,28 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         if start_time:
             parsed_start_time = parse_time_string(start_time)
             if parsed_start_time is None:
-                await ctx.response.send_message(
+                await self.reply(
+                    ctx,
                     f"Invalid start_time format: '{start_time}'. "
                     "Use Unix timestamp, ISO format (2024-01-01T12:00:00Z), "
                     "date (2024-01-01), or relative (+1h, +30m, +2d).",
-                    ephemeral=True,
-                    delete_after=self.delete_after,
                 )
                 return
 
         if end_time:
             parsed_end_time = parse_time_string(end_time)
             if parsed_end_time is None:
-                await ctx.response.send_message(
+                await self.reply(
+                    ctx,
                     f"Invalid end_time format: '{end_time}'. "
                     "Use Unix timestamp, ISO format (2024-01-01T12:00:00Z), "
                     "date (2024-01-01), or relative (+1h, +30m, +2d).",
-                    ephemeral=True,
-                    delete_after=self.delete_after,
                 )
                 return
 
         # Validate that end_time is after start_time if both are provided
         if parsed_start_time and parsed_end_time and parsed_end_time <= parsed_start_time:
-            await ctx.response.send_message(
-                "End time must be after start time.", ephemeral=True, delete_after=self.delete_after
-            )
+            await self.reply(ctx, "End time must be after start time.")
             return
 
         # Check if user has permission for this specific node (for non-admins)
@@ -453,27 +498,21 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         # Validate global annotation permission
         if global_annotation and not is_admin:
-            await ctx.response.send_message(
-                "Only Bridger Admins can create global annotations.", ephemeral=True, delete_after=self.delete_after
-            )
+            await self.reply(ctx, "Only Bridger Admins can create global annotations.")
             return
 
         if not is_admin:
             # For non-admins, verify they own this specific node
             gateway_manager = GatewayManagerEMQX(emqx)
             try:
-                gateway = gateway_manager.get_gateway(normalized_node_id)
-                owner = ctx.client.get_user(gateway.owner_id)
-                if owner != ctx.user:
-                    await ctx.response.send_message(
-                        "You can only add annotations for nodes you own.", ephemeral=True, delete_after=self.delete_after
-                    )
+                gateway = await asyncio.to_thread(gateway_manager.get_gateway, normalized_node_id)
+                if gateway.owner_id != ctx.user.id:
+                    await self.reply(ctx, "You can only add annotations for nodes you own.")
                     return
             except ValueError:
-                await ctx.response.send_message(
+                await self.reply(
+                    ctx,
                     f"Node {normalized_node_id} not found or you don't have permission to annotate it.",
-                    ephemeral=True,
-                    delete_after=self.delete_after,
                 )
                 return
 
@@ -491,7 +530,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         # Write to InfluxDB
         try:
             writer = InfluxWriter(self.bot.influx_client)
-            writer.write_annotation(annotation)
+            await asyncio.to_thread(writer.write_annotation, annotation)
 
             # Build response message
             global_text = " (GLOBAL)" if global_annotation else ""
@@ -510,12 +549,10 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             else:
                 response_msg += "End: Not specified (point-in-time annotation)"
 
-            await ctx.response.send_message(response_msg, ephemeral=True)
+            await self.reply(ctx, response_msg)
         except Exception as e:
             logger.error(f"Failed to write annotation: {e}")
-            await ctx.response.send_message(
-                f"Failed to add annotation: {str(e)}", ephemeral=True, delete_after=self.delete_after
-            )
+            await self.reply(ctx, f"Failed to add annotation: {e}")
 
     @app_commands.check(is_bridger_admin)
     @app_commands.command(
@@ -526,14 +563,14 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         await ctx.response.defer(ephemeral=True)
 
         try:
-            all_gateways = self.gateway_manager.list_gateways()
+            all_gateways = await list_gateways_cached(self.gateway_manager)
         except Exception as e:
             logger.error(f"Failed to list gateways: {e}")
-            await ctx.followup.send(f"Failed to list gateways: {str(e)}", ephemeral=True)
+            await self.reply(ctx, f"Failed to list gateways: {e}")
             return
 
         if not all_gateways:
-            await ctx.followup.send("No gateways found to update.", ephemeral=True)
+            await self.reply(ctx, "No gateways found to update.")
             return
 
         total_gateways = len(all_gateways)
@@ -542,7 +579,9 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         for gateway in all_gateways:
             try:
-                success = self.gateway_manager.update_gateway_user_rules(gateway.node_hex_id_without_bang)
+                success = await asyncio.to_thread(
+                    self.gateway_manager.update_gateway_user_rules, gateway.node_hex_id_without_bang
+                )
                 if success:
                     successful_updates += 1
                     logger.info(f"Successfully updated rules for gateway {gateway.node_hex_id_without_bang}")
@@ -572,7 +611,8 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         else:
             response += "\nNo gateway rules were successfully updated. Check logs for errors."
 
-        await ctx.followup.send(response, ephemeral=True)
+        await gateway_cache.invalidate()
+        await self.reply(ctx, response)
 
 
 def parse_time_string(time_str: str) -> Optional[int]:

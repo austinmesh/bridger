@@ -80,3 +80,37 @@ def test_request_raises_exception(requests_mock, emqx_client):
     with pytest.raises(requests.exceptions.HTTPError):
         response = emqx_client._request("GET", "/test-endpoint")
         emqx_client._handle_response(response)
+
+
+class TestRequestTimeout:
+    def test_default_timeout_is_applied(self, emqx_client, requests_mock):
+        # Without this, a hung EMQX hangs the whole Discord bot rather than one command.
+        requests_mock.get("http://localhost:18083/api/v5/thing", json={})
+
+        emqx_client._request("GET", "/thing")
+
+        assert requests_mock.last_request.timeout == (3.05, 10)
+
+    def test_per_call_timeout_overrides_the_default(self, emqx_client, requests_mock):
+        requests_mock.get("http://localhost:18083/api/v5/thing", json={})
+
+        emqx_client._request("GET", "/thing", timeout=1)
+
+        assert requests_mock.last_request.timeout == 1
+
+    def test_client_timeout_is_configurable(self, requests_mock):
+        client = EMQXClient("http://localhost:18083", "key", "secret", timeout=(1, 2))
+        requests_mock.get("http://localhost:18083/api/v5/thing", json={})
+
+        client._request("GET", "/thing")
+
+        assert requests_mock.last_request.timeout == (1, 2)
+
+    def test_mixin_calls_still_carry_the_timeout(self, emqx_client, requests_mock):
+        # The mixins call _request positionally with data=/params= only, so the new parameter
+        # must stay last and defaulted.
+        requests_mock.get("http://localhost:18083/api/v5/authentication/1/users", json={"data": []})
+
+        emqx_client.list_users("1")
+
+        assert requests_mock.last_request.timeout == (3.05, 10)

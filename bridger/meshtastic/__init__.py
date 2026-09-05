@@ -12,7 +12,7 @@ class DeviceModel:
     def __init__(self, session: ClientSession = None):
         self.session = session
 
-    @cached(ttl=MESHTASTIC_API_CACHE_TTL)
+    @cached(ttl=MESHTASTIC_API_CACHE_TTL, noself=True)
     async def make_request(self) -> list:
         async with self.session.get(MESHTASTIC_API_ENDPOINT + self.device_hardware_path) as response:
             return await response.json()
