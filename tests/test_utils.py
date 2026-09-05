@@ -4,7 +4,6 @@ from bridger.utils import should_ignore_pki_message
 
 
 class TestShouldIgnorePkiMessage:
-
     @patch("bridger.utils.MQTT_TOPIC", "msh/US/2/e/LongFast/#")
     def test_should_ignore_pki_message_true(self):
         pki_topic = "msh/US/2/e/LongFast/PKI/some/subtopic"

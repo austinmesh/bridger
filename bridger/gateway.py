@@ -2,8 +2,9 @@ import os
 import re
 import secrets
 import string
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator, Union
+from typing import Union
 
 from discord import Member, User
 from requests import HTTPError
@@ -57,8 +58,8 @@ class GatewayManagerEMQX:
 
         try:
             node_id = int(gateway_id_without_bang, 16)
-        except ValueError:
-            raise ValueError("Gateway ID must be a hex number")
+        except ValueError as e:
+            raise ValueError("Gateway ID must be a hex number") from e
 
         logger.debug(f"Gateway ID: {gateway_id_without_bang}")
         logger.debug(f"Node ID: {node_id}")
@@ -104,9 +105,9 @@ class GatewayManagerEMQX:
             self.emqx.create_user_authorization_rules_built_in_database(gateway.user_string, rules)
         except HTTPError as e:
             if e.response.status_code == 400:
-                raise GatewayError(f"Error creating gateway: {e}", gateway)
+                raise GatewayError(f"Error creating gateway: {e}", gateway) from e
             else:
-                raise GatewayError(f"Gateway already exists: {e}", gateway)
+                raise GatewayError(f"Gateway already exists: {e}", gateway) from e
         return gateway, password
 
     def update_gateway_user_rules(self, gateway_id: str) -> bool:
@@ -148,7 +149,7 @@ class GatewayManagerEMQX:
         try:
             password = self.generate_password()
             self.emqx.update_user_password(self.authentication_id, gateway.user_string, password)
-        except Exception:
-            raise ValueError("Failed to reset password")
+        except Exception as e:
+            raise ValueError("Failed to reset password") from e
 
         return gateway, password

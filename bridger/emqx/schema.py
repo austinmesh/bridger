@@ -68,9 +68,7 @@ class AuthnBuiltinDB(Authn):
     bootstrap_type: str = "plain"
     enable: bool = True
 
-    password_hash_algorithm: Optional[Union[AuthnHashSimple, AuthnHashBcryptRW, AuthnHashPBKDF2]] = field(
-        default_factory=dict
-    )
+    password_hash_algorithm: Union[AuthnHashSimple, AuthnHashBcryptRW, AuthnHashPBKDF2, None] = field(default_factory=dict)
 
     def __post_init__(self):
         valid_mechanisms = ["password_based"]

@@ -1,7 +1,7 @@
 from dataclasses import fields
 from functools import lru_cache
 from textwrap import dedent
-from typing import Union
+from typing import Optional, Union
 
 from influxdb_client import InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -26,7 +26,7 @@ class InfluxReader:
                 logger.bind(query=query).error(f"Error querying InfluxDB: {e}")
         return None
 
-    def get_node_info(self, node_id: int, range: str = "-6h") -> Union[dict, None]:
+    def get_node_info(self, node_id: int, range: str = "-6h") -> Optional[dict]:
         query = dedent(f"""
             import "strings"
             import "contrib/bonitoo-io/hex"
