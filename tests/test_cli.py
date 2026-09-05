@@ -1,3 +1,4 @@
+import argparse
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -385,3 +386,36 @@ class TestMainFunction:
             parsed = mock_generate_apikey.call_args.args[0]
             assert parsed.bootstrap_file == "/tmp/boot"
             assert parsed.force is True
+
+
+class TestDecodeCommand:
+    POSITION_PACKET = "CioNZNgWDBX/////IhMIAxINDQDADBIVAMDCxbgBERgBNd+T2zZIBVgKeAUSCExvbmdGYXN0GgkhMGMxNmQ4NjQ="
+
+    def test_decodes_a_real_packet(self):
+        # loguru holds the stderr it captured at import, so capsys cannot see its output.
+        from bridger.cli import decode_command
+
+        with patch("bridger.log.logger") as log:
+            decode_command(argparse.Namespace(packet=self.POSITION_PACKET))
+
+        logged = " ".join(str(call) for call in log.info.call_args_list)
+        # Unlike the old bridger.mesh entry point, this needs no InfluxDB connection.
+        assert "PositionPoint" in logged
+
+    def test_bad_base64_is_reported_not_raised(self):
+        from bridger.cli import decode_command
+
+        with patch("bridger.log.logger") as log:
+            decode_command(argparse.Namespace(packet="not-valid-base64!!"))
+
+        assert log.exception.called or log.warning.called
+
+    def test_registered_as_a_subcommand(self):
+        from bridger.cli import decode_command, main
+
+        with patch("sys.argv", ["bridger", "decode", self.POSITION_PACKET]), patch("bridger.cli.decode_command") as mocked:
+            main()
+
+        mocked.assert_called_once()
+        assert mocked.call_args[0][0].packet == self.POSITION_PACKET
+        assert decode_command is not None
