@@ -326,7 +326,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
     @app_commands.command(name="reset-password", description="Reset MQTT account password")
     @app_commands.autocomplete(node_id=node_id_autocomplete)
     async def reset_password(self, ctx: Interaction, node_id: str):
-        gateway, password = self.gateway_manager.reset_gateway_password(node_id, ctx.user)
+        gateway, password = self.gateway_manager.reset_gateway_password(node_id)
 
         await ctx.response.send_message(
             f"Gateway **{gateway.node_hex_id_without_bang}** password reset. The username is **{gateway.user_string}** with new password: `{password}`",  # noqa: E501

@@ -66,11 +66,6 @@ async def get_displaynames_all(request):
     displaynames = await device.get_all_displaynames()
     return web.json_response(displaynames)
 
-    logo_path = os.path.join(os.path.dirname(__file__), "../logo/logo.png")
-    if not os.path.exists(logo_path):
-        return web.Response(status=404, text="Logo not found")
-    return web.FileResponse(logo_path)
-
 
 @routes.get("/health")
 async def health_check(request):

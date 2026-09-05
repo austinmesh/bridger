@@ -122,7 +122,7 @@ def test_get_gateway(gateway_manager):
 # Test reset_gateway_password
 def test_reset_gateway_password(gateway_manager, emqx_mock):
     emqx_mock.update_user_password.return_value = None
-    gateway, password = gateway_manager.reset_gateway_password("1a2b3c4d", mock_discord_user)
+    gateway, password = gateway_manager.reset_gateway_password("1a2b3c4d")
 
     assert isinstance(gateway, GatewayData)
     assert gateway.owner_id == mock_discord_user.id
@@ -281,3 +281,23 @@ def test_update_gateway_user_rules_emqx_error(gateway_manager, emqx_mock):
 
     # Verify that create was not called due to the exception
     emqx_mock.create_user_authorization_rules_built_in_database.assert_not_called()
+
+
+def test_reset_gateway_password_uses_real_owner_not_caller(gateway_manager, emqx_mock):
+    # The username is built from the gateway's registered owner. Deriving it from the caller
+    # meant an admin reset would target a user string that does not exist in EMQX.
+    emqx_mock.update_user_password.return_value = None
+
+    gateway, _ = gateway_manager.reset_gateway_password("1a2b3c4d")
+
+    assert gateway.owner_id == 1234567890
+    assert gateway.user_string == "1234567890-1a2b3c4d"
+
+
+def test_delete_gateway_user_removes_rules_before_user(gateway_manager, emqx_mock):
+    calls = []
+    emqx_mock.delete_user.side_effect = lambda *a, **kw: calls.append("user")
+    emqx_mock.delete_user_authorization_rules_built_in_database.side_effect = lambda *a, **kw: calls.append("rules")
+
+    assert gateway_manager.delete_gateway_user("1a2b3c4d") is True
+    assert calls == ["rules", "user"]

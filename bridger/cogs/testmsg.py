@@ -20,6 +20,7 @@ from bridger.log import logger
 from bridger.mqtt import PBPacketProcessor
 from bridger.utils import should_ignore_pki_message
 
+DEFAULT_EMBED_COLOR = 0x5865F2  # Discord blurple, used when the gateway id will not parse
 MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
 TEST_MESSAGE_MATCHERS = [
@@ -60,8 +61,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
     def create_embed(self, service_envelope: ServiceEnvelope):
         packet = service_envelope.packet
-        gateway = service_envelope.gateway_id
-        color = int(gateway[-6:], 16)
+        gateway = service_envelope.gateway_id or ""
         snr = packet.rx_snr
         rssi = packet.rx_rssi
         hop_count = None
@@ -71,19 +71,29 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         if packet.hop_start > 0:
             hop_count = packet.hop_start - packet.hop_limit
 
-        embed = Embed(color=color)
-        # Try to get node info for the gateway hex ID
+        # Parse the gateway id exactly once. Everything below degrades to a default rather
+        # than raising: this runs inside the MQTT loop, where an exception drops the message.
         gateway_id = None
         node_info = None
 
         try:
-            gateway_id = int(gateway.strip("!"), 16)
-            node_info = self.influx_reader.get_node_info(gateway_id)
+            gateway_id = int(gateway.lstrip("!"), 16)
         except (ValueError, TypeError) as e:
-            logger.error(f"Failed to parse gateway ID '{gateway}': {e}")
+            logger.warning(f"Failed to parse gateway ID '{gateway}': {e}")
+        else:
+            try:
+                node_info = self.influx_reader.get_node_info(gateway_id)
+            except Exception:
+                logger.exception(f"Failed to look up node info for gateway {gateway}")
 
-        node_id = gateway_id if gateway_id is not None else int(gateway, 16)
-        gateway_name = self.format_node_name(node_id, node_info)
+        if gateway_id is None:
+            color = DEFAULT_EMBED_COLOR
+            gateway_name = f"**{gateway or 'unknown'}**"
+        else:
+            color = gateway_id & 0xFFFFFF
+            gateway_name = self.format_node_name(gateway_id, node_info)
+
+        embed = Embed(color=color)
         embed.description = f"Heard by {gateway_name} - `{gateway}` at {formatted_time}"
         embed.add_field(name="SNR", value=snr, inline=True)
         embed.add_field(name="RSSI", value=rssi, inline=True)

@@ -67,3 +67,43 @@ def test_neighbor_info_handler_generates_points():
     assert len(result) == 2
     assert result[0].neighbor_id == 111
     assert result[1].neighbor_id == 222
+
+
+def _neighbor_base_data(neighbors):
+    return {
+        "_from": 123,
+        "to": 456,
+        "packet_id": 789,
+        "rx_time": 1600000000,
+        "rx_snr": 12.5,
+        "rx_rssi": -30,
+        "hop_limit": 3,
+        "hop_start": 0,
+        "channel_id": "test",
+        "gateway_id": "!abc123",
+        "node_id": 123,
+        "last_sent_by_id": 999,
+        "neighbors": neighbors,
+    }
+
+
+def test_neighbor_info_handler_does_not_carry_over_snr():
+    # A neighbor with no snr of its own used to inherit the previous neighbor's. proto3 omits
+    # snr when it is 0.0, so a real 0 dB reading hit the same bug.
+    base_data = _neighbor_base_data(
+        [
+            {"node_id": 111, "snr": 6.0},
+            {"node_id": 222},
+            {"node_id": 333, "snr": 0.0},
+        ]
+    )
+
+    result = NeighborInfoHandler(packet=MagicMock(), payload_dict={}, base_data=base_data).handle()
+
+    assert [(p.neighbor_id, p.snr) for p in result] == [(111, 6.0), (222, None), (333, 0.0)]
+
+
+def test_neighbor_info_handler_returns_none_without_neighbors():
+    base_data = _neighbor_base_data([])
+
+    assert NeighborInfoHandler(packet=MagicMock(), payload_dict={}, base_data=base_data).handle() is None
