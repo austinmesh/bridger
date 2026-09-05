@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "loki",
-        "uid": "P982945308D3682D1"
+        "uid": "loki"
       },
       "fieldConfig": {
         "defaults": {},
@@ -54,7 +54,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "P982945308D3682D1"
+            "uid": "loki"
           },
           "direction": "backward",
           "editorMode": "code",

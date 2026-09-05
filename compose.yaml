@@ -168,6 +168,8 @@ services:
       - GF_SERVER_ROOT_URL
       - GF_SERVER_PROTOCOL
       # - GF_INSTALL_PLUGINS=influxdb
+      - INFLUXDB_V2_ORG
+      - INFLUXDB_V2_BUCKET
       - INFLUXDB_V2_TOKEN
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
