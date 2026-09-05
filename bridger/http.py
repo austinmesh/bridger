@@ -1,11 +1,7 @@
-import os
-
 from aiohttp import ClientSession, ClientTimeout, web
 
-from bridger.config import EMQX_HTTP_CONNECT_TIMEOUT, MESHTASTIC_API_TIMEOUT
+from bridger.config import EMQX_HTTP_CONNECT_TIMEOUT, MESHTASTIC_API_TIMEOUT, VERSION
 from bridger.meshtastic import DeviceModel
-
-VERSION = os.getenv("SENTRY_RELEASE", "development")
 
 routes = web.RouteTableDef()
 device = None

@@ -1,5 +1,4 @@
 import asyncio
-import os
 import random
 import re
 import time
@@ -16,7 +15,21 @@ from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
 
 from bridger.cache import TTLCache
-from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
+from bridger.config import (
+    MQTT_BROKER,
+    MQTT_CLIENT_ID,
+    MQTT_HEALTHY_SECONDS,
+    MQTT_PASS,
+    MQTT_PORT,
+    MQTT_RESTART_MAX_DELAY,
+    MQTT_RESTART_MIN_DELAY,
+    MQTT_TEST_CHANNEL,
+    MQTT_TEST_CHANNEL_ID,
+    MQTT_TOPIC,
+    MQTT_USER,
+    NODE_INFO_CACHE_TTL,
+    TEST_MESSAGE_MATCH_ALL,
+)
 from bridger.dataclasses import NodeData, TextMessagePoint
 from bridger.deduplication import PacketDeduplicator
 from bridger.influx.interfaces import InfluxReader
@@ -25,17 +38,8 @@ from bridger.mqtt import PBPacketProcessor
 from bridger.utils import should_ignore_pki_message
 
 DEFAULT_EMBED_COLOR = 0x5865F2  # Discord blurple, used when the gateway id will not parse
-NODE_INFO_CACHE_TTL = int(os.getenv("BRIDGER_NODE_INFO_CACHE_TTL", 300))
-
-# Supervisor backoff. The budget resets only after a demonstrably healthy run, so a broker
-# that accepts a connection and immediately drops it still backs off.
-MQTT_RESTART_MIN_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MIN_DELAY", 1))
-MQTT_RESTART_MAX_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MAX_DELAY", 300))
-MQTT_HEALTHY_SECONDS = float(os.getenv("BRIDGER_MQTT_HEALTHY_SECONDS", 60))
-MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
-MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
 TEST_MESSAGE_MATCHERS = [
-    re.compile(r"^.*$", flags=re.IGNORECASE) if os.getenv("TEST_MESSAGE_MATCH_ALL", "false").lower() == "true" else None,
+    re.compile(r"^.*$", flags=re.IGNORECASE) if TEST_MESSAGE_MATCH_ALL else None,
     re.compile(r"^\!\b.+$", flags=re.IGNORECASE),
 ]
 
@@ -193,15 +197,16 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 
     async def run_mqtt(self):
         topic = MQTT_TOPIC.removesuffix("/#")
-        channel = MQTT_TEST_CHANNEL_MESHTASTIC
+        channel = MQTT_TEST_CHANNEL
         full_topic = f"{topic}/{channel}/#"
 
         logger.info(f"Attempting to connect to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
         async with aiomqtt.Client(
             MQTT_BROKER,
-            int(MQTT_PORT),
+            MQTT_PORT,
             username=MQTT_USER,
             password=MQTT_PASS,
+            identifier=f"{MQTT_CLIENT_ID}-testmsg",
             clean_session=True,
         ) as client:
             reason_codes = await client.subscribe(full_topic)
@@ -286,4 +291,4 @@ class TestMsg(commands.GroupCog, name="testmsg"):
 async def setup(bot: commands.Bot):
     influx_reader = InfluxReader(influx_client=bot.influx_client)
     # cog_load starts the supervisor, and cog_unload cancels it.
-    await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_DISCORD, influx_reader))
+    await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_ID, influx_reader))

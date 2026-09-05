@@ -219,3 +219,9 @@ pip-selfcheck.json
 
 # We are not using uv yet so let's ignore the uv.lock file for now
 uv.lock
+
+# Terraform module cache and state
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*

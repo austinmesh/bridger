@@ -3,7 +3,7 @@ import signal
 from paho.mqtt.client import MQTT_ERR_SUCCESS, CallbackAPIVersion
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_USER
+from bridger.config import MQTT_BROKER, MQTT_CLIENT_ID, MQTT_PASS, MQTT_PORT, MQTT_USER
 from bridger.influx import create_influx_client
 from bridger.log import logger
 from bridger.mqtt import BridgerMQTT
@@ -18,7 +18,7 @@ from bridger.mqtt import BridgerMQTT
 def connect_to_mqtt(influx_client):
     logger.info(f"Attempting to connect to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
 
-    client = BridgerMQTT(influx_client, CallbackAPIVersion.VERSION2)
+    client = BridgerMQTT(influx_client, CallbackAPIVersion.VERSION2, client_id=f"{MQTT_CLIENT_ID}-bridger")
     client.username_pw_set(MQTT_USER, MQTT_PASS)
 
     # This will raise an exception if connection fails

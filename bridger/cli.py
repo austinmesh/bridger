@@ -1,5 +1,4 @@
 import argparse
-import os
 import secrets
 from pathlib import Path
 
@@ -9,14 +8,11 @@ from rich.table import Table
 from rich.text import Text
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
+from bridger.config import EMQX_API_KEY, EMQX_SECRET_KEY, EMQX_URL
 from bridger.emqx import EMQXClient
 from bridger.gateway import GatewayBackendError, GatewayError, GatewayManagerEMQX
 
 console = Console()
-
-EMQX_API_KEY = os.getenv("EMQX_API_KEY")
-EMQX_SECRET_KEY = os.getenv("EMQX_SECRET_KEY")
-EMQX_URL = os.getenv("EMQX_URL")
 
 emqx = EMQXClient(EMQX_URL, EMQX_API_KEY, EMQX_SECRET_KEY)
 
