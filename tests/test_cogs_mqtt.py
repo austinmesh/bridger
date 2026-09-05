@@ -1,7 +1,7 @@
 import asyncio
 import time
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from discord import Interaction, Member, Role, User
@@ -316,3 +316,298 @@ class TestDescribeGatewayError:
 
         assert "1a2b3c4d" in message
         assert "HTTP" not in message
+
+    def test_each_error_type_gets_its_own_message(self):
+        gateway = _gateway()
+
+        already = MQTTCog._describe_gateway_error(GatewayAlreadyExistsError("x", gateway, status_code=409))
+        invalid = MQTTCog._describe_gateway_error(GatewayValidationError("bad id", gateway, status_code=400))
+        backend = MQTTCog._describe_gateway_error(GatewayBackendError("emqx down", gateway, status_code=500))
+
+        assert already == "Gateway already exists: 1a2b3c4d"
+        assert "Invalid gateway request" in invalid
+        # A backend failure must not claim the gateway already exists, which is what it used to.
+        assert "already exists" not in backend
+        assert "HTTP 500" in backend
+
+
+class TestParseTimeString:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("1640995200", 1640995200),
+            ("2022-01-01T00:00:00Z", 1640995200),
+            ("2022-01-01T00:00:00+00:00", 1640995200),
+            ("2022-01-01T00:00:00", 1640995200),  # naive input is assumed UTC
+            ("2022-01-01", 1640995200),
+            ("  2022-01-01  ", 1640995200),
+        ],
+    )
+    def test_absolute_formats(self, value, expected):
+        assert mqtt_cog.parse_time_string(value) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "offset"),
+        [("+1h", 3600), ("+30m", 1800), ("+2d", 172800), ("1w", 604800), ("-1h", -3600)],
+    )
+    def test_relative_formats(self, value, offset, monkeypatch):
+        monkeypatch.setattr(mqtt_cog.time, "time", lambda: 1_000_000)
+
+        assert mqtt_cog.parse_time_string(value) == 1_000_000 + offset
+
+    @pytest.mark.parametrize("value", ["", "   ", "garbage", "5x", "2022-13-45", "not-a-time"])
+    def test_unparseable_returns_none(self, value):
+        assert mqtt_cog.parse_time_string(value) is None
+
+
+class TestReply:
+    @pytest.fixture
+    def cog(self):
+        from discord.ext import commands
+
+        from bridger.cogs.mqtt import MQTTCog
+
+        return MQTTCog(MagicMock(spec=commands.Bot), MagicMock(), MagicMock())
+
+    async def test_uses_send_message_before_deferring(self, cog):
+        interaction = make_interaction()
+        interaction.response.send_message = AsyncMock()
+        interaction.followup.send = AsyncMock()
+
+        await cog.reply(interaction, "hello")
+
+        interaction.response.send_message.assert_awaited_once()
+        interaction.followup.send.assert_not_awaited()
+
+    async def test_uses_followup_after_deferring(self, cog):
+        # send_message raises InteractionResponded once the command has deferred.
+        interaction = make_interaction(responded=True)
+        interaction.response.send_message = AsyncMock()
+        interaction.followup.send = AsyncMock()
+
+        await cog.reply(interaction, "hello")
+
+        interaction.followup.send.assert_awaited_once()
+        interaction.response.send_message.assert_not_awaited()
+
+    async def test_followup_does_not_pass_delete_after(self, cog):
+        # delete_after is not a Webhook.send parameter.
+        interaction = make_interaction(responded=True)
+        interaction.followup.send = AsyncMock()
+
+        await cog.reply(interaction, "hello")
+
+        assert "delete_after" not in interaction.followup.send.call_args.kwargs
+
+
+@pytest.fixture
+def cog():
+    from discord.ext import commands
+
+    from bridger.cogs.mqtt import MQTTCog
+
+    bot = MagicMock(spec=commands.Bot)
+    bot.get_user.return_value = None
+    bot.influx_client = MagicMock()  # set by BridgerBot.setup_hook, not part of the Bot spec
+    return MQTTCog(bot, MagicMock(), MagicMock())
+
+
+def deferred_interaction(**kwargs):
+    interaction = make_interaction(**kwargs)
+    interaction.response.defer = AsyncMock()
+    interaction.response.send_message = AsyncMock()
+    interaction.followup.send = AsyncMock()
+    return interaction
+
+
+def _sent_call(interaction):
+    """Whichever reply path was actually taken."""
+    for mock in (interaction.followup.send, interaction.response.send_message):
+        if mock.await_args:
+            return mock.await_args
+    raise AssertionError("nothing was sent")
+
+
+def sent_content(interaction):
+    return _sent_call(interaction)[0][0]
+
+
+def sent_kwargs(interaction):
+    return _sent_call(interaction)[1]
+
+
+class TestListAccountsCommand:
+    async def test_an_admin_sees_every_gateway(self, cog, admin_role):
+        role = make_role(ADMIN_ROLE)
+        interaction = deferred_interaction(user_id=1, guild_roles=[role], user_roles=[role])
+        cog.gateway_manager.list_gateways.return_value = [
+            GatewayData(node_id=1, owner_id=1),
+            GatewayData(node_id=2, owner_id=999),
+        ]
+
+        await cog.list_accounts.callback(cog, interaction)
+
+        assert "There are 2 gateways in the system." in sent_content(interaction)
+
+    async def test_a_regular_user_sees_only_their_own(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.list_gateways.return_value = [
+            GatewayData(node_id=1, owner_id=1),
+            GatewayData(node_id=2, owner_id=999),
+        ]
+
+        await cog.list_accounts.callback(cog, interaction)
+
+        assert "There are 1 of your own gateways" in sent_content(interaction)
+
+    async def test_message_when_the_user_owns_nothing(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.list_gateways.return_value = [GatewayData(node_id=2, owner_id=999)]
+
+        await cog.list_accounts.callback(cog, interaction)
+
+        assert "You don't own any provisioned gateways." in sent_content(interaction)
+
+    async def test_paginates_beyond_25(self, cog, admin_role):
+        role = make_role(ADMIN_ROLE)
+        interaction = deferred_interaction(user_id=1, guild_roles=[role], user_roles=[role])
+        cog.gateway_manager.list_gateways.return_value = [GatewayData(node_id=i, owner_id=1) for i in range(30)]
+
+        await cog.list_accounts.callback(cog, interaction)
+
+        assert "view" in sent_kwargs(interaction)
+
+
+class TestRequestAccountCommand:
+    async def test_returns_the_credentials_and_invalidates_the_cache(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        gateway = GatewayData(node_id=0xCBAF0421, owner_id=1)
+        cog.gateway_manager.create_gateway_user.return_value = (gateway, "hunter2xyz")
+
+        # Prime the cache so the invalidation is observable.
+        await mqtt_cog.gateway_cache.get_or_load(mqtt_cog.GATEWAY_CACHE_KEY, lambda: ["stale"])
+
+        await cog.request_account.callback(cog, interaction, "cbaf0421")
+
+        content = sent_content(interaction)
+        assert "cbaf0421" in content
+        assert "hunter2xyz" in content
+        assert await mqtt_cog.gateway_cache._cache.get(mqtt_cog.GATEWAY_CACHE_KEY) is None
+
+
+class TestDeleteAccountCommand:
+    async def test_reports_success(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.delete_gateway_user.return_value = True
+
+        await cog.delete_account.callback(cog, interaction, "cbaf0421")
+
+        assert "Gateway deleted" in sent_content(interaction)
+
+    async def test_reports_a_missing_gateway(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.delete_gateway_user.return_value = False
+
+        await cog.delete_account.callback(cog, interaction, "cbaf0421")
+
+        assert "Gateway not found" in sent_content(interaction)
+
+
+class TestIsAliveCommand:
+    async def test_reports_silence(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.get_gateway.return_value = GatewayData(node_id=0xCBAF0421, owner_id=1)
+        cog.influx_reader.get_recent_packets.return_value = []
+
+        await cog.is_alive.callback(cog, interaction, "cbaf0421")
+
+        assert "haven't received any packets" in sent_content(interaction)
+
+    async def test_reports_the_most_recent_packet(self, cog):
+        from datetime import UTC, datetime
+
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.get_gateway.return_value = GatewayData(node_id=0xCBAF0421, owner_id=1)
+
+        record = MagicMock()
+        record.values = {"_time": datetime(2024, 1, 1, tzinfo=UTC)}
+        table = MagicMock()
+        table.records = [record]
+        cog.influx_reader.get_recent_packets.return_value = [table]
+
+        await cog.is_alive.callback(cog, interaction, "cbaf0421")
+
+        assert "is alive" in sent_content(interaction)
+
+
+class TestAddAnnotationCommand:
+    async def test_rejects_a_bad_start_time(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+
+        await cog.add_annotation.callback(cog, interaction, "cbaf0421", "reposition", "moved", start_time="nonsense")
+
+        assert "Invalid start_time format" in sent_content(interaction)
+
+    async def test_rejects_an_end_before_the_start(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+
+        await cog.add_annotation.callback(
+            cog, interaction, "cbaf0421", "reposition", "moved", start_time="2024-01-02", end_time="2024-01-01"
+        )
+
+        assert "End time must be after start time." in sent_content(interaction)
+
+    async def test_rejects_a_global_annotation_from_a_non_admin(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+
+        await cog.add_annotation.callback(cog, interaction, "cbaf0421", "reposition", "moved", global_annotation=True)
+
+        assert "Only Bridger Admins" in sent_content(interaction)
+
+    async def test_rejects_annotating_someone_elses_node(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+
+        with patch("bridger.cogs.mqtt.GatewayManagerEMQX") as cls:
+            cls.return_value.get_gateway.return_value = GatewayData(node_id=0xCBAF0421, owner_id=999)
+
+            await cog.add_annotation.callback(cog, interaction, "cbaf0421", "reposition", "moved")
+
+        assert "only add annotations for nodes you own" in sent_content(interaction)
+
+    async def test_writes_the_annotation_for_the_owner(self, cog, admin_role):
+        interaction = deferred_interaction(user_id=1)
+
+        with (
+            patch("bridger.cogs.mqtt.GatewayManagerEMQX") as cls,
+            patch("bridger.cogs.mqtt.InfluxWriter") as writer_cls,
+        ):
+            cls.return_value.get_gateway.return_value = GatewayData(node_id=0xCBAF0421, owner_id=1)
+
+            await cog.add_annotation.callback(cog, interaction, "cbaf0421", "reposition", "moved")
+
+        writer_cls.return_value.write_annotation.assert_called_once()
+        assert "Annotation added for node" in sent_content(interaction)
+
+
+class TestUpdateAllGatewayRulesCommand:
+    async def test_summarises_successes_and_failures(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.list_gateways.return_value = [
+            GatewayData(node_id=1, owner_id=1),
+            GatewayData(node_id=2, owner_id=1),
+        ]
+        cog.gateway_manager.update_gateway_user_rules.side_effect = [True, False]
+
+        await cog.update_all_gateway_rules.callback(cog, interaction)
+
+        content = sent_content(interaction)
+        assert "**Successful updates:** 1" in content
+        assert "**Failed updates:** 1" in content
+
+    async def test_handles_having_no_gateways(self, cog):
+        interaction = deferred_interaction(user_id=1)
+        cog.gateway_manager.list_gateways.return_value = []
+
+        await cog.update_all_gateway_rules.callback(cog, interaction)
+
+        assert "No gateways found to update." in sent_content(interaction)
