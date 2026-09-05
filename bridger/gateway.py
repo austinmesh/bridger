@@ -3,7 +3,7 @@ import re
 import secrets
 import string
 from dataclasses import dataclass
-from typing import Union
+from typing import Optional, Union
 
 from discord import Member, User
 from requests import HTTPError
@@ -32,9 +32,22 @@ class GatewayData(NodeMixin):
 
 
 class GatewayError(Exception):
-    def __init__(self, message: str, gateway: GatewayData):
+    def __init__(self, message: str, gateway: GatewayData, *, status_code: Optional[int] = None):
         super().__init__(message)
         self.gateway = gateway
+        self.status_code = status_code
+
+
+class GatewayAlreadyExistsError(GatewayError):
+    """The gateway is already registered in EMQX."""
+
+
+class GatewayValidationError(GatewayError):
+    """EMQX rejected the request as malformed."""
+
+
+class GatewayBackendError(GatewayError):
+    """EMQX failed for a reason that is not the caller's fault."""
 
 
 class GatewayManagerEMQX:
@@ -92,6 +105,33 @@ class GatewayManagerEMQX:
         mqtt_rules = [{"action": "all", "topic": f"{topic_prefix}/+/{gateway_id}", "permission": "allow"}]
         return {"rules": mqtt_rules, "username": username}
 
+    @staticmethod
+    def _map_http_error(error: HTTPError, gateway: GatewayData) -> GatewayError:
+        """Turn an EMQX HTTPError into the specific GatewayError it represents.
+
+        Everything that was not a 400 used to be reported as "gateway already exists", so an
+        expired API key or a broker outage told the user their gateway was registered.
+        """
+        response = getattr(error, "response", None)
+        status_code = getattr(response, "status_code", None)
+        code = None
+
+        if response is not None:
+            try:
+                body = response.json()
+            except Exception:
+                body = None
+            # A MagicMock response returns a truthy mock from .get(), so insist on a real dict.
+            code = body.get("code") if isinstance(body, dict) else None
+
+        if status_code == 409 or (status_code == 400 and code == "ALREADY_EXISTS"):
+            return GatewayAlreadyExistsError(f"Gateway already exists: {error}", gateway, status_code=status_code)
+
+        if status_code == 400:
+            return GatewayValidationError(f"Error creating gateway: {error}", gateway, status_code=status_code)
+
+        return GatewayBackendError(f"Error talking to EMQX: {error}", gateway, status_code=status_code)
+
     def create_gateway_user(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
         gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
         password = self.generate_password()
@@ -101,12 +141,24 @@ class GatewayManagerEMQX:
 
         try:
             self.emqx.create_user(self.authentication_id, gateway.user_string, password)
-            self.emqx.create_user_authorization_rules_built_in_database(gateway.user_string, rules)
         except HTTPError as e:
-            if e.response.status_code == 400:
-                raise GatewayError(f"Error creating gateway: {e}", gateway) from e
-            else:
-                raise GatewayError(f"Gateway already exists: {e}", gateway) from e
+            raise self._map_http_error(e, gateway) from e
+
+        # Roll the user back if the rules do not land. Otherwise the account exists with no
+        # ACL rules, the caller never receives the password, and every retry from here on
+        # reports "already exists".
+        try:
+            self.emqx.create_user_authorization_rules_built_in_database(gateway.user_string, rules)
+        except Exception as e:
+            try:
+                self.emqx.delete_user(self.authentication_id, gateway.user_string)
+                logger.warning(f"Rolled back EMQX user {gateway.user_string} after its rules failed to apply")
+            except Exception:
+                logger.exception(f"Orphaned EMQX user {gateway.user_string}: rules failed and rollback failed too")
+
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            raise GatewayBackendError(f"Failed to create authorization rules: {e}", gateway, status_code=status_code) from e
+
         return gateway, password
 
     def update_gateway_user_rules(self, gateway_id: str) -> bool:

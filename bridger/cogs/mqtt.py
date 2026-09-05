@@ -9,7 +9,13 @@ from discord.ext import commands
 from discord.utils import get
 
 from bridger.dataclasses import AnnotationPoint
-from bridger.gateway import GatewayError, GatewayManagerEMQX, emqx
+from bridger.gateway import (
+    GatewayAlreadyExistsError,
+    GatewayError,
+    GatewayManagerEMQX,
+    GatewayValidationError,
+    emqx,
+)
 from bridger.influx.interfaces import InfluxReader, InfluxWriter
 from bridger.log import logger
 
@@ -216,6 +222,19 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         self.gateway_manager = gateway_manager
         self.influx_reader = influx_reader
 
+    @staticmethod
+    def _describe_gateway_error(error: GatewayError) -> str:
+        node_id = error.gateway.node_hex_id_without_bang
+
+        if isinstance(error, GatewayAlreadyExistsError):
+            return f"Gateway already exists: {node_id}"
+
+        if isinstance(error, GatewayValidationError):
+            return f"Invalid gateway request for {node_id}: {error}"
+
+        status = f" (HTTP {error.status_code})" if error.status_code else ""
+        return f"Gateway backend error for {node_id}{status}: {error}"
+
     async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError):
         # Log the type of error and error message
         logger.debug(f"App command error: {type(error)}: {error}")
@@ -223,7 +242,7 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
         if isinstance(error, app_commands.errors.CommandInvokeError):
             if isinstance(error.original, GatewayError):
                 await interaction.response.send_message(
-                    f"Gateway already exists: {error.original.gateway.node_hex_id_without_bang}",
+                    self._describe_gateway_error(error.original),
                     ephemeral=True,
                     delete_after=self.delete_after,
                 )
