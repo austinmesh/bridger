@@ -25,27 +25,17 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run isort
-        uses: isort/isort-action@v1.1.1
-        id: isort
+      - name: Run ruff check
+        uses: astral-sh/ruff-action@v3
         with:
-          configuration: --profile black --check-only --diff -l 125 --verbose
+          version: 0.16.4
+          args: check --output-format github
 
-      - name: isort summary
-        env:
-          ISORT_SUMMARY: ${{ steps.isort.outputs.isort-result }}
-        run: |
-          echo "\`\`\`python" >> $GITHUB_STEP_SUMMARY
-          echo "$ISORT_SUMMARY" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-      - name: Run black
-        uses: psf/black@26.5.1
+      - name: Run ruff format
+        uses: astral-sh/ruff-action@v3
         with:
-          options: "-l 125 --check --diff --verbose"
+          version: 0.16.4
+          args: format --check --diff
   test:
     runs-on: ubuntu-24.04
     steps:
@@ -60,7 +50,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Test with pytest
         run: pytest --cov bridger
