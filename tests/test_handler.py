@@ -5,7 +5,7 @@ from meshtastic.protobuf.portnums_pb2 import PortNum
 
 from bridger.dataclasses import NeighborInfoPacket
 from bridger.mesh.base import PacketHandler
-from bridger.mesh.handler_registry import HANDLER_MAP, handler
+from bridger.mesh.handler_registry import DEFAULT_PROTOCOL, HANDLER_MAP, handler
 from bridger.mesh.handlers.neighborinfo import NeighborInfoHandler
 
 
@@ -14,7 +14,20 @@ def test_handler_decorator_registers_class():
         portnum = PortNum.TEXT_MESSAGE_APP
 
     handler(DummyHandler)
-    assert DummyHandler in HANDLER_MAP[PortNum.TEXT_MESSAGE_APP]
+    assert DummyHandler in HANDLER_MAP[(DEFAULT_PROTOCOL, PortNum.TEXT_MESSAGE_APP)]
+
+
+def test_handler_decorator_namespaces_by_protocol():
+    # Meshtastic portnums are small ints, so a second protocol's message types would collide
+    # if the registry were keyed on the portnum alone.
+    class MeshcoreHandler:
+        protocol = "meshcore"
+        portnum = PortNum.TEXT_MESSAGE_APP
+
+    handler(MeshcoreHandler)
+
+    assert HANDLER_MAP[("meshcore", PortNum.TEXT_MESSAGE_APP)] == [MeshcoreHandler]
+    assert MeshcoreHandler not in HANDLER_MAP[(DEFAULT_PROTOCOL, PortNum.TEXT_MESSAGE_APP)]
 
 
 def test_handler_decorator_raises_if_missing_portnum():
