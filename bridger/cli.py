@@ -102,7 +102,7 @@ def generate_apikey_command(args):
     influxdb_token_exists = False
 
     if env_file.exists() and not args.force:
-        with open(env_file, "r") as f:
+        with open(env_file) as f:
             content = f.read()
             if "EMQX_API_KEY=" in content:
                 emqx_api_key_exists = True

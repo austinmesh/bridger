@@ -34,7 +34,7 @@ class NodeData(NodeMixin):
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class TelemetryPoint(ABC):
+class TelemetryPoint(ABC):  # noqa: B024 - abstractness is enforced in __post_init__
     def __post_init__(self):
         if self.__class__ == TelemetryPoint:
             raise TypeError("Cannot instantiate abstract class.")

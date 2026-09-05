@@ -1,8 +1,8 @@
 import os
 import re
 import time
-from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal, Optional
 
 from discord import ButtonStyle, Embed, Interaction, app_commands, ui
 from discord.ext import commands
@@ -16,7 +16,7 @@ from bridger.log import logger
 BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
 
 
-async def node_id_autocomplete(interaction: Interaction, current: str) -> List[app_commands.Choice[str]]:
+async def node_id_autocomplete(interaction: Interaction, current: str) -> list[app_commands.Choice[str]]:
     """Autocomplete function for node_id parameter."""
     try:
         logger.debug(f"Autocomplete called with current='{current}'")
@@ -175,7 +175,11 @@ class GatewayPaginationView(ui.View):
 
             embed.add_field(
                 name="Gateway",
-                value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                value=(
+                    f"ID: **{gateway.node_hex_id_without_bang}**\n"
+                    f"Owner: **{owner_name}**\n"
+                    f"Username: **{gateway.user_string}**"
+                ),
                 inline=False,
             )
 
@@ -293,7 +297,11 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
                 embed.add_field(
                     name="Gateway",
-                    value=f"ID: **{gateway.node_hex_id_without_bang}**\nOwner: **{owner_name}**\nUsername: **{gateway.user_string}**",
+                    value=(
+                        f"ID: **{gateway.node_hex_id_without_bang}**\n"
+                        f"Owner: **{owner_name}**\n"
+                        f"Username: **{gateway.user_string}**"
+                    ),
                     inline=False,
                 )
 
@@ -580,12 +588,12 @@ def parse_time_string(time_str: str) -> Optional[int]:
                 dt = datetime.fromisoformat(time_str)
             else:
                 # Assume UTC if no timezone
-                dt = datetime.fromisoformat(time_str).replace(tzinfo=timezone.utc)
+                dt = datetime.fromisoformat(time_str).replace(tzinfo=UTC)
             return int(dt.timestamp())
 
         # Try parsing date only (YYYY-MM-DD)
         if re.match(r"^\d{4}-\d{2}-\d{2}$", time_str):
-            dt = datetime.fromisoformat(time_str + "T00:00:00").replace(tzinfo=timezone.utc)
+            dt = datetime.fromisoformat(time_str + "T00:00:00").replace(tzinfo=UTC)
             return int(dt.timestamp())
 
     except (ValueError, OverflowError) as e:

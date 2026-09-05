@@ -166,6 +166,6 @@ class PBPacketProcessor(PacketProcessor):
             self.service_envelope.packet.decoded.CopyFrom(data)
         except DecodeError as e:
             logger.exception(f"Error decrypting message: {e}")
-            raise PacketProcessorError(f"Error decrypting message: {e}")
+            raise PacketProcessorError(f"Error decrypting message: {e}") from e
 
         return True
