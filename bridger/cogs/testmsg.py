@@ -1,5 +1,9 @@
+import asyncio
 import os
+import random
 import re
+import time
+from contextlib import suppress
 from datetime import datetime
 from functools import partial
 from typing import Optional
@@ -10,8 +14,8 @@ from discord import Embed, Message
 from discord.ext import commands
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from bridger.cogs.cache import TTLCache
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
 from bridger.dataclasses import NodeData, TextMessagePoint
 from bridger.deduplication import PacketDeduplicator
@@ -21,6 +25,13 @@ from bridger.mqtt import PBPacketProcessor
 from bridger.utils import should_ignore_pki_message
 
 DEFAULT_EMBED_COLOR = 0x5865F2  # Discord blurple, used when the gateway id will not parse
+NODE_INFO_CACHE_TTL = int(os.getenv("BRIDGER_NODE_INFO_CACHE_TTL", 300))
+
+# Supervisor backoff. The budget resets only after a demonstrably healthy run, so a broker
+# that accepts a connection and immediately drops it still backs off.
+MQTT_RESTART_MIN_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MIN_DELAY", 1))
+MQTT_RESTART_MAX_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MAX_DELAY", 300))
+MQTT_HEALTHY_SECONDS = float(os.getenv("BRIDGER_MQTT_HEALTHY_SECONDS", 60))
 MQTT_TEST_CHANNEL_MESHTASTIC = os.getenv("MQTT_TEST_CHANNEL", "+")
 MQTT_TEST_CHANNEL_DISCORD = int(os.getenv("MQTT_TEST_CHANNEL_ID", 1253788609316913265))
 TEST_MESSAGE_MATCHERS = [
@@ -39,11 +50,34 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         self.discord_channel = None
         self.influx_reader = influx_reader
         self.deduplicator = PacketDeduplicator(maxlen=100, use_gateway_id=True)
+        # Per instance rather than a class attribute, so it does not leak between tests.
+        self.node_info_cache = TTLCache(NODE_INFO_CACHE_TTL, name="node-info")
+        self._mqtt_task = None
+        # Injectable so the supervisor's backoff can be tested without patching the shared
+        # time module, which pytest and asyncio also rely on.
+        self._clock = time.monotonic
+
+    async def cog_load(self):
+        self._mqtt_task = asyncio.create_task(self._mqtt_supervisor(), name="testmsg-mqtt")
+
+    async def cog_unload(self):
+        if self._mqtt_task:
+            self._mqtt_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._mqtt_task
 
     @commands.Cog.listener(name="on_ready")
     async def on_ready(self):
         self.discord_channel = self.bot.get_channel(self.discord_channel_id)
         logger.info(f"TestMsg cog is ready and channel is: {self.discord_channel}")
+
+    async def get_node_info(self, node_id: int) -> Optional[dict]:
+        """Look up node info off the event loop, cached.
+
+        This runs once per matched message inside the MQTT loop, and the underlying Flux query
+        covers 6 hours, so it is both blocking and repetitive without the cache.
+        """
+        return await self.node_info_cache.get_or_load(str(node_id), partial(self.influx_reader.get_node_info, node_id))
 
     @staticmethod
     def format_node_name(node_id: int, node_info: Optional[dict] = None) -> str:
@@ -59,7 +93,28 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         else:
             return f"**{node_id}**"
 
-    def create_embed(self, service_envelope: ServiceEnvelope):
+    @staticmethod
+    def parse_gateway_id(gateway_id: str) -> Optional[int]:
+        try:
+            return int((gateway_id or "").lstrip("!"), 16)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to parse gateway ID '{gateway_id}': {e}")
+            return None
+
+    async def build_embed(self, service_envelope: ServiceEnvelope) -> Embed:
+        """Look up the gateway's node info, then render. The lookup is the only blocking part."""
+        gateway_id = self.parse_gateway_id(service_envelope.gateway_id)
+        node_info = None
+
+        if gateway_id is not None:
+            try:
+                node_info = await self.get_node_info(gateway_id)
+            except Exception:
+                logger.exception(f"Failed to look up node info for gateway {service_envelope.gateway_id}")
+
+        return self.create_embed(service_envelope, node_info)
+
+    def create_embed(self, service_envelope: ServiceEnvelope, node_info: Optional[dict] = None):
         packet = service_envelope.packet
         gateway = service_envelope.gateway_id or ""
         snr = packet.rx_snr
@@ -71,20 +126,9 @@ class TestMsg(commands.GroupCog, name="testmsg"):
         if packet.hop_start > 0:
             hop_count = packet.hop_start - packet.hop_limit
 
-        # Parse the gateway id exactly once. Everything below degrades to a default rather
-        # than raising: this runs inside the MQTT loop, where an exception drops the message.
-        gateway_id = None
-        node_info = None
-
-        try:
-            gateway_id = int(gateway.lstrip("!"), 16)
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Failed to parse gateway ID '{gateway}': {e}")
-        else:
-            try:
-                node_info = self.influx_reader.get_node_info(gateway_id)
-            except Exception:
-                logger.exception(f"Failed to look up node info for gateway {gateway}")
+        # Degrades to a default rather than raising: this renders inside the MQTT loop, where
+        # an exception drops the message.
+        gateway_id = self.parse_gateway_id(gateway)
 
         if gateway_id is None:
             color = DEFAULT_EMBED_COLOR
@@ -110,15 +154,41 @@ class TestMsg(commands.GroupCog, name="testmsg"):
             message_id = message.id
             logger.warning(f"Embed limit reached for message ID {message_id}, skipping update")
             return
-        message.embeds.append(self.create_embed(envelope))
+        message.embeds.append(await self.build_embed(envelope))
         await message.edit(embeds=message.embeds)
 
-    @retry(
-        stop=stop_after_attempt(10),
-        wait=wait_exponential(multiplier=1, min=1, max=60),
-        retry=retry_if_exception_type((aiomqtt.MqttError, ConnectionRefusedError, OSError)),
-        reraise=True,
-    )
+    async def _mqtt_supervisor(self):
+        """Keep run_mqtt alive for the lifetime of the cog.
+
+        Restarts are unbounded on purpose: a broker outage should never permanently kill the
+        bridge. Delay grows exponentially with full jitter and is capped, and the budget is
+        reset only once a run has stayed up long enough to count as healthy.
+        """
+        await self.bot.wait_until_ready()
+
+        if self.discord_channel is None:
+            self.discord_channel = self.bot.get_channel(self.discord_channel_id)
+
+        delay = MQTT_RESTART_MIN_DELAY
+
+        while True:
+            started = self._clock()
+
+            try:
+                await self.run_mqtt()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("MQTT loop failed")
+
+            if self._clock() - started >= MQTT_HEALTHY_SECONDS:
+                delay = MQTT_RESTART_MIN_DELAY
+
+            sleep_for = min(delay, MQTT_RESTART_MAX_DELAY) * (0.5 + random.random())
+            logger.info(f"Restarting MQTT loop in {sleep_for:.1f}s")
+            await asyncio.sleep(sleep_for)
+            delay = min(delay * 2, MQTT_RESTART_MAX_DELAY)
+
     async def run_mqtt(self):
         topic = MQTT_TOPIC.removesuffix("/#")
         channel = MQTT_TEST_CHANNEL_MESHTASTIC
@@ -167,7 +237,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                     packet_id = packet.id
                     source_node_id = getattr(packet, "from")
                     source_node = NodeData(node_id=source_node_id)
-                    node_info = self.influx_reader.get_node_info(source_node_id)
+                    node_info = await self.get_node_info(source_node_id)
 
                     name = self.format_node_name(source_node_id, node_info)
                     message_id = await self.queue.get(packet_id)
@@ -196,7 +266,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                         now_timestamp = int(datetime.now().timestamp())
                         content = f"Test message from {name} - `{source_node.node_hex_id_with_bang}` <t:{now_timestamp}:R>\n> {data.text}"  # noqa: E501
 
-                        embeds = [self.create_embed(service_envelope)]
+                        embeds = [await self.build_embed(service_envelope)]
                         try:
                             message: Message = await self.discord_channel.send(content, embeds=embeds)
                             await self.queue.set(packet_id, message.id, ttl=3600)
@@ -204,17 +274,7 @@ class TestMsg(commands.GroupCog, name="testmsg"):
                             logger.exception("Failed to send Discord message")
 
 
-def restart_mqtt_on_exception(task, bot: commands.Bot):
-    try:
-        task.result()
-    except Exception:
-        logger.exception("MQTT task failed. Restarting...")
-        new_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
-        new_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))
-
-
 async def setup(bot: commands.Bot):
     influx_reader = InfluxReader(influx_client=bot.influx_client)
+    # cog_load starts the supervisor, and cog_unload cancels it.
     await bot.add_cog(TestMsg(bot, MQTT_TEST_CHANNEL_DISCORD, influx_reader))
-    run_mqtt_task = bot.loop.create_task(bot.cogs["testmsg"].run_mqtt())
-    run_mqtt_task.add_done_callback(partial(restart_mqtt_on_exception, bot=bot))

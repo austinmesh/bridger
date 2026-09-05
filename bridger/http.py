@@ -1,7 +1,8 @@
 import os
 
-from aiohttp import ClientSession, web
+from aiohttp import ClientSession, ClientTimeout, web
 
+from bridger.config import EMQX_HTTP_CONNECT_TIMEOUT, MESHTASTIC_API_TIMEOUT
 from bridger.meshtastic import DeviceModel
 
 VERSION = os.getenv("SENTRY_RELEASE", "development")
@@ -21,7 +22,7 @@ def create_app():
 
 async def on_startup(app):
     global device, session
-    session = ClientSession()
+    session = ClientSession(timeout=ClientTimeout(total=MESHTASTIC_API_TIMEOUT, connect=EMQX_HTTP_CONNECT_TIMEOUT))
     device = DeviceModel(session=session)
 
 
