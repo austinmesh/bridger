@@ -57,8 +57,8 @@
             "uid": "P982945308D3682D1"
           },
           "direction": "backward",
-          "editorMode": "builder",
-          "expr": "{job=\"bridger\"} | json | label_format level=record_level_name",
+          "editorMode": "code",
+          "expr": "{job=\"bridger\"} | json | line_format \"{{ .text }}\"",
           "queryType": "range",
           "refId": "A"
         }
