@@ -122,11 +122,21 @@ from(bucket: "meshtastic")
 
 ## Commands
 
-Updating requirements.txt
+Updating the requirements lock files
+
+Both locks are generated with `uv` and pinned to the container's Linux platform, so they
+resolve identically no matter which machine regenerates them:
 
 ```bash
-pri -v $PWD:/bridger -w /bridger docker.io/library/python:3.12 bash -c "pip install pip-tools; pip-compile --strip-extras"
+uv pip compile pyproject.toml --strip-extras \
+  --python-platform x86_64-unknown-linux-gnu --python-version 3.12 -o requirements.txt
+
+uv pip compile pyproject.toml --extra test --strip-extras \
+  --python-platform x86_64-unknown-linux-gnu --python-version 3.12 -o requirements-dev.txt
 ```
+
+`requirements.txt` is runtime only (what the container installs); `requirements-dev.txt` adds
+the `test` extra and is what CI installs.
 
 ## Grafana
 

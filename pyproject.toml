@@ -29,33 +29,54 @@ dependencies = [
     "meshtastic",
     "paho-mqtt",
     "protobuf",
-    "pytest",
-    "pytest-cov",
     "python-dotenv",
-    "pytest-aiohttp",
     "requests",
-    "requests-mock",
     "rich",
     "sentry-sdk",
     "tenacity",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-aiohttp",
+    "pytest-cov",
+    "requests-mock",
+]
+
+[project.scripts]
+bridger = "bridger.cli:main"
+
 [project.urls]
 Source = "https://github.com/austinmesh/bridger"
 Graphs = "https://graphs.austinmesh.org"
 
-[tool.black]
+[tool.setuptools.packages.find]
+include = ["bridger*"]
+
+[tool.ruff]
 line-length = 125
+target-version = "py312"
 
-[tool.isort]
-profile = "black"
-line_length = 125
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    # Keep Optional[X] and Union[X, Y] rather than PEP 604's X | None / X | Y. The point
+    # classes are all @dataclass_json, which introspects annotations at runtime, and ruff's
+    # own UP045 docs warn that PEP 604 syntax can break libraries that do that.
+    "UP007",
+    "UP045",
+]
 
-[tool.setuptools]
-py-modules = []
+[tool.ruff.lint.isort]
+known-first-party = ["bridger"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests trigger properties inside pytest.raises() by bare attribute access, which
+# is the standard idiom but reads as a useless expression to flake8-bugbear.
+"tests/**" = ["B018"]
 
 [tool.pytest.ini_options]
-consider_namespace_packages = true
 asyncio_mode = "auto"
 addopts = [
     "--cov=bridger",
