@@ -1,9 +1,9 @@
 name: build
 
 on:
+  # Not filtered to main: with stacked pull requests the intermediate PRs target each other,
+  # and a base-branch filter means they get no linting or tests at all.
   pull_request:
-    branches:
-      - main
   merge_group:
     types:
       - checks_requested
@@ -57,6 +57,9 @@ jobs:
 
   build:
     runs-on: self-hosted
+    # Only for changes actually landing on main. A stack of PRs would otherwise push an
+    # image per intermediate PR, none of which is ever deployed.
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
 
     permissions:
       contents: read
