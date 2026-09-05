@@ -98,7 +98,7 @@ class PositionPoint(TelemetryPoint):
 
     latitude_i: int = field(metadata={"influx_kind": "field"})
     longitude_i: int = field(metadata={"influx_kind": "field"})
-    gps_time: Optional[str] = field(default=None, metadata={"influx_kind": "field"})
+    gps_time: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     precision_bits: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     altitude: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
     PDOP: Optional[int] = field(default=None, metadata={"influx_kind": "field"})

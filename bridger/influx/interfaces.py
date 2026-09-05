@@ -116,15 +116,18 @@ class InfluxReader:
     def _extract_first_record(table_list):
         if not table_list:
             return None
+
         try:
             table = table_list[0]
-            if not table.records:
-                return None
-            return table.records[0]
         except Exception as e:
-            extra = {k: locals()[k] for k in ("table_list", "table")}
-            logger.bind(**extra).error(f"Error processing query result: {e}")
+            # Guard only the indexing. The previous version read `table` out of locals() in
+            # the handler, which raised KeyError when the indexing itself was what failed.
+            logger.bind(table_list=repr(table_list)).error(f"Error processing query result: {e}")
             return None
+
+        if not table.records:
+            return None
+        return table.records[0]
 
 
 class InfluxWriter:

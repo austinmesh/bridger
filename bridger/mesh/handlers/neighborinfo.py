@@ -11,24 +11,26 @@ class NeighborInfoHandler(PacketHandler):
     portnum = PortNum.NEIGHBORINFO_APP
 
     def handle(self):
-        neighbors = [
-            {"neighbor_id": neighbor.get("node_id", None), "snr": neighbor.get("snr", None)}
-            for neighbor in self.base_data.get("neighbors", [])
-        ]
+        neighbors = self.base_data.pop("neighbors", None) or []
 
         if not neighbors:
             logger.bind(**self.base_data).debug("No neighbors found in payload")
             return None
 
         neighbor_points = []
-        self.base_data.pop("neighbors")
 
         for neighbor in neighbors:
-            self.base_data["neighbor_id"] = neighbor.get("neighbor_id")
+            # A fresh copy per neighbor. Mutating one shared dict let each neighbor inherit
+            # the previous neighbor's snr whenever its own was missing.
+            point_data = dict(self.base_data)
+            point_data["neighbor_id"] = neighbor.get("node_id")
 
-            if neighbor.get("snr"):
-                self.base_data["snr"] = neighbor.get("snr")
+            snr = neighbor.get("snr")
+            if snr is not None:
+                # Explicitly not a truthiness check: proto3 omits snr when it is 0.0, and 0 dB
+                # is a real reading, not a missing one.
+                point_data["snr"] = snr
 
-            neighbor_points.append(NeighborInfoPacket(**self.base_data))
+            neighbor_points.append(NeighborInfoPacket(**point_data))
 
         return neighbor_points

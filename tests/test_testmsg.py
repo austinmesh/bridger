@@ -204,3 +204,57 @@ class TestFormatNodeName:
         node_info = {"short_name": None, "long_name": None}
         result = TestMsg.format_node_name(123456789, node_info)
         assert result == "**123456789**"
+
+
+def _embed_envelope(gateway_id, *, rx_time=1600000000, hop_start=3, hop_limit=2):
+    envelope = MagicMock()
+    envelope.gateway_id = gateway_id
+    envelope.packet.rx_snr = 6.25
+    envelope.packet.rx_rssi = -95
+    envelope.packet.rx_time = rx_time
+    envelope.packet.hop_start = hop_start
+    envelope.packet.hop_limit = hop_limit
+    return envelope
+
+
+class TestCreateEmbed:
+    def test_uses_node_info_and_derives_colour_from_gateway(self, testmsg_cog, mock_influx_reader):
+        mock_influx_reader.get_node_info.return_value = {"short_name": "ABCD", "long_name": "A Node"}
+
+        embed = testmsg_cog.create_embed(_embed_envelope("!1a2b3c4d"))
+
+        assert embed.color.value == 0x2B3C4D
+        assert "**ABCD** - A Node" in embed.description
+        mock_influx_reader.get_node_info.assert_called_once_with(0x1A2B3C4D)
+
+    def test_unparseable_gateway_id_does_not_raise(self, testmsg_cog, mock_influx_reader):
+        # Previously this raised twice: once on int(gateway[-6:], 16) before the try block,
+        # and again on the fallback, which retried the parse with the "!" still attached.
+        embed = testmsg_cog.create_embed(_embed_envelope("!notahexvalue"))
+
+        assert embed.color.value == 0x5865F2
+        assert "notahexvalue" in embed.description
+        mock_influx_reader.get_node_info.assert_not_called()
+
+    def test_empty_gateway_id_does_not_raise(self, testmsg_cog):
+        embed = testmsg_cog.create_embed(_embed_envelope(""))
+
+        assert embed.color.value == 0x5865F2
+        assert "unknown" in embed.description
+
+    def test_influx_failure_still_renders_embed(self, testmsg_cog, mock_influx_reader):
+        mock_influx_reader.get_node_info.side_effect = RuntimeError("influx down")
+
+        embed = testmsg_cog.create_embed(_embed_envelope("!1a2b3c4d"))
+
+        assert embed.color.value == 0x2B3C4D
+        assert "**439041101**" in embed.description  # falls back to the bare node id
+
+    def test_hop_fields(self, testmsg_cog, mock_influx_reader):
+        mock_influx_reader.get_node_info.return_value = None
+
+        direct = testmsg_cog.create_embed(_embed_envelope("!1a2b3c4d", hop_start=3, hop_limit=3))
+        hopped = testmsg_cog.create_embed(_embed_envelope("!1a2b3c4d", hop_start=3, hop_limit=1))
+
+        assert [f.value for f in direct.fields if f.name == "Hops"] == ["Direct/3"]
+        assert [f.value for f in hopped.fields if f.name == "Hops"] == ["2/3"]

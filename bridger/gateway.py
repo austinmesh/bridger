@@ -2,7 +2,6 @@ import os
 import re
 import secrets
 import string
-from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Union
 
@@ -45,7 +44,7 @@ class GatewayManagerEMQX:
         self.emqx = emqx
 
     @staticmethod
-    def prepare_gateway_id(gateway_id: str) -> tuple[str, str]:
+    def prepare_gateway_id(gateway_id: str) -> tuple[str, str, int]:
         # Prepend ! to gateway_id if it doesn't have it
         if not gateway_id.startswith("!"):
             gateway_id = f"!{gateway_id}"
@@ -71,7 +70,7 @@ class GatewayManagerEMQX:
         alphabet = string.ascii_letters + string.digits
         return "".join(secrets.choice(alphabet) for i in range(PASSWORD_LENGTH))
 
-    def list_gateways(self) -> Generator[GatewayData, None, None]:
+    def list_gateways(self) -> list[GatewayData]:
         emqx_users = self.emqx.list_users(self.authentication_id)
 
         # Filter for users that match only our regex pattern
@@ -125,9 +124,13 @@ class GatewayManagerEMQX:
     def delete_gateway_user(self, gateway_id: str) -> bool:
         try:
             gateway = self.get_gateway(gateway_id)
-            self.emqx.delete_user(self.authentication_id, gateway.user_string)
+            # Drop the rules before the user. The other order leaves the rules behind whenever
+            # the second call fails, and the user is already gone by then so there is nothing
+            # left to look them up by.
             self.emqx.delete_user_authorization_rules_built_in_database(gateway.user_string)
+            self.emqx.delete_user(self.authentication_id, gateway.user_string)
         except Exception:
+            logger.exception(f"Failed to delete gateway user for {gateway_id}")
             return False
 
         return True
@@ -142,9 +145,11 @@ class GatewayManagerEMQX:
 
         raise ValueError("Gateway not found")
 
-    def reset_gateway_password(self, gateway_id: str, discord_user: Union[User, Member]) -> tuple[GatewayData, str]:
-        gateway_id, gateway_id_without_bang, node_id = self.prepare_gateway_id(gateway_id)
-        gateway = GatewayData(node_id=node_id, owner_id=discord_user.id)
+    def reset_gateway_password(self, gateway_id: str) -> tuple[GatewayData, str]:
+        # Resolve the real owner rather than assuming it is the caller. Building the username
+        # from discord_user.id only worked because this is gated on the owner check; an admin
+        # reset would have targeted a user string that does not exist.
+        gateway = self.get_gateway(gateway_id)
 
         try:
             password = self.generate_password()
