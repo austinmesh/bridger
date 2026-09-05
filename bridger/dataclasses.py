@@ -137,13 +137,28 @@ class TextMessagePoint(TelemetryPoint):
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class TraceroutePoint(TelemetryPoint):
-    measurement_name = "traceroute"
+class TracerouteHopPoint(TelemetryPoint):
+    """One leg of a traceroute.
 
-    route: Optional[int] = None
-    snr_towards: Optional[int] = None
-    route_back: Optional[int] = None
-    snr_back: Optional[int] = None
+    A new measurement rather than more columns on the old `traceroute` one: the old points
+    carried no route data at all (none of the four RouteDiscovery fields declared an
+    influx_kind, so they were silently dropped), and one row per packet has become one row
+    per hop, so the semantics genuinely changed.
+
+    direction and hop_index have to be tags. Bridger writes no explicit timestamp, so the
+    server assigns ingest time; as fields, every hop of one traceroute would collapse into a
+    single series and timestamp and overwrite each other, leaving exactly one hop. This is the
+    same reason NeighborInfoPacket.neighbor_id and PowerTelemetryPoint.channel are tags.
+    """
+
+    measurement_name = "traceroute_hop"
+
+    direction: str = field(metadata={"influx_kind": "tag"})  # "towards" or "back"
+    hop_index: int = field(metadata={"influx_kind": "tag"})  # 0-based leg within the direction
+    from_node_id: int = field(metadata={"influx_kind": "tag"})  # transmitter of this leg
+    node_id: int = field(metadata={"influx_kind": "tag"})  # receiver, which measured the SNR
+    route_length: Optional[int] = field(default=None, metadata={"influx_kind": "field"})
+    snr: Optional[float] = field(default=None, metadata={"influx_kind": "field"})  # dB, already scaled
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
