@@ -196,14 +196,12 @@ services:
       - run
       - --server.http.listen-addr=0.0.0.0:12345
       - --storage.path=/var/lib/alloy/data
-      - /mnt/config/config-docker.alloy
+      - /mnt/config/config.alloy
     ports:
-      - "12345:12345"
-    security_opt:
-      - label=disable
+      - "127.0.0.1:12345:12345"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config/alloy:/mnt/config
+      - bridger-data:/var/lib/bridger:ro
       - alloy-data:/var/lib/alloy
     networks:
       - bridger
