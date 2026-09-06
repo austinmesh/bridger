@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from bridger.cogs.cache import TTLCache
+from bridger.cache import TTLCache
 
 
 @pytest.fixture
