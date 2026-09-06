@@ -15,7 +15,7 @@ from discord.ext import commands
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.portnums_pb2 import TEXT_MESSAGE_APP
 
-from bridger.cogs.cache import TTLCache
+from bridger.cache import TTLCache
 from bridger.config import MQTT_BROKER, MQTT_PASS, MQTT_PORT, MQTT_TOPIC, MQTT_USER
 from bridger.dataclasses import NodeData, TextMessagePoint
 from bridger.deduplication import PacketDeduplicator

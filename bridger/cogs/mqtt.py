@@ -9,7 +9,7 @@ from discord import ButtonStyle, Embed, Interaction, Member, app_commands, ui
 from discord.ext import commands, tasks
 from discord.utils import get
 
-from bridger.cogs.cache import TTLCache
+from bridger.cache import TTLCache
 from bridger.dataclasses import AnnotationPoint
 from bridger.gateway import (
     GatewayAlreadyExistsError,
