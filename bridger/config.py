@@ -65,6 +65,8 @@ MQTT_RESTART_MIN_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MIN_DELAY", 1))
 MQTT_RESTART_MAX_DELAY = float(os.getenv("BRIDGER_MQTT_RESTART_MAX_DELAY", 300))
 MQTT_HEALTHY_SECONDS = float(os.getenv("BRIDGER_MQTT_HEALTHY_SECONDS", 60))
 
-# Logging and release
+# Logging and release. LOGURU_LEVEL is not listed here because loguru reads it itself: it
+# backs the default `level` of logger.add(), so it sets the threshold for both the stderr
+# handler loguru installs and the file sink added in bridger/log.py.
 LOG_PATH = os.getenv("LOG_PATH", "logs/bridger.log")
 VERSION = os.getenv("SENTRY_RELEASE", "development")

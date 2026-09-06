@@ -1,4 +1,8 @@
 [Container]
+# Explicit, because quadlet otherwise names the container systemd-emqx. certbot's
+# ExecStopPost reaches the broker with `podman exec emqx` to reload its TLS listeners,
+# and that lookup is by container name, not by HostName.
+ContainerName = emqx
 HostName = emqx
 Image = docker.io/emqx/emqx:6.3.0
 Network = bridger.network

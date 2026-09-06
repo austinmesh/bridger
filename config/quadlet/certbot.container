@@ -3,15 +3,18 @@ Before = emqx.service
 
 [Container]
 HostName = certbot
-# The deploy hook runs only when a certificate was actually renewed.
+# EMQX runs as uid 1000 inside its container while certbot writes as container-root. Under
+# rootless podman those are different subuids, so without widening the modes EMQX cannot
+# traverse live/ and archive/ or read privkey.pem, and its TLS listeners fail to start.
 #
-# chmod: EMQX runs as uid 1000 inside its container while certbot writes privkey.pem 0600 as
-# container-root. Under rootless podman those are different subuids, so EMQX cannot read the
-# key and its TLS listeners fail to start. The certbot-conf volume is mounted only by these
-# two containers, so widening the mode is contained to that volume.
+# This is a --post-hook rather than a --deploy-hook so it runs on every certbot invocation,
+# not only when a certificate was actually issued or renewed. A deploy that points EMQX at
+# an already-issued certificate has to find the permissions correct too. The certbot-conf
+# volume is mounted only by these two containers, so widening the modes is contained to it.
 #
-# The marker file is picked up by ExecStopPost below, which reloads EMQX's TLS listeners.
-Exec = certonly --standalone --non-interactive --agree-tos -d mqtt.austinmesh.org --email andys@andyshinn.as --deploy-hook "chmod 0644 /etc/letsencrypt/archive/mqtt.austinmesh.org/privkey*.pem && touch /etc/letsencrypt/renewed"
+# The --deploy-hook marker file is picked up by ExecStopPost below, which reloads EMQX's TLS
+# listeners. It only fires when the certificate actually changed.
+Exec = certonly --standalone --non-interactive --agree-tos -d mqtt.austinmesh.org --email andys@andyshinn.as --deploy-hook "touch /etc/letsencrypt/renewed" --post-hook "chmod 0755 /etc/letsencrypt/live /etc/letsencrypt/archive /etc/letsencrypt/live/mqtt.austinmesh.org /etc/letsencrypt/archive/mqtt.austinmesh.org && chmod 0644 /etc/letsencrypt/archive/mqtt.austinmesh.org/privkey*.pem"
 PublishPort = 8094:80
 Image = docker.io/certbot/certbot:v5.8.0
 Volume = certbot-conf.volume:/etc/letsencrypt
@@ -24,10 +27,16 @@ RemainAfterExit = no
 # Reload EMQX's TLS listeners only when the certificate actually changed, so gateways on
 # 8883 are not disconnected on every timer run. The check goes through the emqx container
 # because that is what has the volume mounted at a known path.
-ExecStopPost = /bin/sh -c 'podman exec emqx test -f /etc/letsencrypt/renewed || exit 0; \
-    podman exec emqx emqx ctl listeners restart ssl:default; \
-    podman exec emqx emqx ctl listeners restart wss:default; \
-    podman exec emqx rm -f /etc/letsencrypt/renewed'
+#
+# --user root because certbot created the marker as container-root in a root-owned
+# directory; EMQX's uid 1000 cannot unlink it. The steps are chained with && so the marker
+# survives a failed reload (broker down, listener restart error) and is retried on the next
+# timer run instead of being silently dropped. The leading - keeps a failure here from
+# failing the certbot unit, since the certificate itself was obtained successfully.
+ExecStopPost = -/bin/sh -c 'podman exec emqx test -f /etc/letsencrypt/renewed || exit 0; \
+    podman exec emqx emqx ctl listeners restart ssl:default && \
+    podman exec emqx emqx ctl listeners restart wss:default && \
+    podman exec --user root emqx rm -f /etc/letsencrypt/renewed'
 
 [Install]
 WantedBy = default.target
