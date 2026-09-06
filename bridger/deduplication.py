@@ -28,6 +28,7 @@ class PacketDeduplicator:
         # Insertion-ordered, so eviction pops from the front; `in` and len() still work, but
         # membership is O(1) rather than the deque's linear scan.
         self.message_queue: OrderedDict[Hashable, float] = OrderedDict()
+        self._warned_full = False
 
     def _key(self, gateway_id: str, packet_id: int) -> Hashable:
         return (gateway_id, packet_id) if self.use_gateway_id else packet_id
@@ -49,12 +50,21 @@ class PacketDeduplicator:
                 del self.message_queue[key]
 
         if len(self.message_queue) > self.maxlen:
-            # Hitting this means the window is too small for the deployment: entries are being
-            # forgotten before their TTL, so genuine duplicates can slip through.
-            logger.warning(f"Deduplication window full at {self.maxlen} entries, evicting before TTL")
+            if not self._warned_full:
+                # Hitting this means the window is too small for the deployment: entries are
+                # being forgotten before their TTL, so genuine duplicates can slip through.
+                # Latched, because a saturated window is one entry over on every subsequent
+                # packet, and warning per packet would flood the log exactly when the bridge
+                # is busiest.
+                logger.warning(f"Deduplication window full at {self.maxlen} entries, evicting before TTL")
+                self._warned_full = True
 
             while len(self.message_queue) > self.maxlen:
                 self.message_queue.popitem(last=False)
+        elif len(self.message_queue) < self.maxlen:
+            # Dropped back under the cap on its own, so re-arm: a window that drains and then
+            # saturates again is a new occurrence worth reporting.
+            self._warned_full = False
 
     def is_duplicate_packet(self, gateway_id: str, packet_id: int) -> bool:
         self._evict()

@@ -281,3 +281,47 @@ class TestProtocolAgnosticApi:
 
         assert dedup.should_process_packet("!gw", 1) is True
         assert dedup.is_duplicate(_envelope("!gw", 1)) is True
+
+
+class TestWindowFullWarning:
+    @staticmethod
+    def _clocked(**kwargs):
+        now = [0.0]
+        dedup = PacketDeduplicator(clock=lambda: now[0], **kwargs)
+        return dedup, now
+
+    @patch("bridger.deduplication.logger")
+    def test_no_warning_while_the_window_has_room(self, mock_logger):
+        dedup, _ = self._clocked(ttl=10**6, maxlen=10)
+
+        for packet_id in range(10):
+            dedup.should_process(_envelope("!gw", packet_id))
+
+        mock_logger.warning.assert_not_called()
+
+    @patch("bridger.deduplication.logger")
+    def test_warns_once_however_long_the_window_stays_full(self, mock_logger):
+        # A saturated window is one entry over the cap on every subsequent packet, so an
+        # unlatched warning fires per packet and floods the log when the bridge is busiest.
+        dedup, _ = self._clocked(ttl=10**6, maxlen=3)
+
+        for packet_id in range(100):
+            dedup.should_process(_envelope("!gw", packet_id))
+
+        assert mock_logger.warning.call_count == 1
+
+    @patch("bridger.deduplication.logger")
+    def test_rearms_once_the_window_drains(self, mock_logger):
+        dedup, now = self._clocked(ttl=60, maxlen=3)
+
+        for packet_id in range(10):
+            dedup.should_process(_envelope("!gw", packet_id))
+
+        assert mock_logger.warning.call_count == 1
+
+        # Everything ages out, so saturating again is a fresh occurrence.
+        now[0] = 1000
+        for packet_id in range(100, 110):
+            dedup.should_process(_envelope("!gw", packet_id))
+
+        assert mock_logger.warning.call_count == 2
