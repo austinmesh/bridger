@@ -171,6 +171,32 @@ def generate_apikey_command(args):
     console.print(f"\nBootstrap file created at: [bold]{bootstrap_file}[/bold]", style="green")
 
 
+def decode_command(args):
+    import base64
+
+    from google.protobuf.message import DecodeError
+    from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
+
+    from bridger.log import file_logger, logger
+    from bridger.mesh import PacketProcessorError, PBPacketProcessor
+
+    logger.remove(file_logger)
+
+    try:
+        service_envelope = ServiceEnvelope.FromString(base64.b64decode(args.packet))
+        logger.info(f"Service envelope: \n{service_envelope}")
+
+        processor = PBPacketProcessor(service_envelope, force_decode=True)
+        logger.info(f"Decoded packet: \n{processor.payload_dict}")
+        logger.info(f"Data: {processor.data}")
+    except PacketProcessorError as e:
+        logger.warning(f"Error processing packet: {e}")
+    except DecodeError as e:
+        logger.exception(f"Error decoding message: {e}")
+    except Exception as e:
+        logger.exception(f"Error processing packet: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Bridger CLI - MQTT gateway management")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -197,6 +223,11 @@ def main():
     )
     apikey_parser.add_argument("--force", "-f", action="store_true", help="Force overwrite existing files")
     apikey_parser.set_defaults(func=generate_apikey_command)
+
+    # Decode command
+    decode_parser = subparsers.add_parser("decode", help="Decode a base64 protobuf ServiceEnvelope")
+    decode_parser.add_argument("packet", help="Base64 encoded protobuf message")
+    decode_parser.set_defaults(func=decode_command)
 
     args = parser.parse_args()
 

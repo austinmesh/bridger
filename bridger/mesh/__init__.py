@@ -14,7 +14,7 @@ import bridger.mesh.handlers  # noqa: F401 # We need to import handlers to regis
 from bridger.crypto import CryptoEngine
 from bridger.dataclasses import TelemetryPoint
 from bridger.log import logger
-from bridger.mesh.handler_registry import HANDLER_MAP
+from bridger.mesh.handler_registry import DEFAULT_PROTOCOL, HANDLER_MAP
 
 
 class PacketProcessorError(Exception):
@@ -80,9 +80,13 @@ class PBPacketProcessor(PacketProcessor):
     def portnum_friendly_name(self) -> Optional[str]:
         return getattr(self.portnum_protocol, "name", None)
 
+    @property
+    def handler_key(self):
+        return (DEFAULT_PROTOCOL, self.portnum)
+
     @cached_property
     def payload(self) -> Union[Message, str, bytes]:
-        if self.portnum in HANDLER_MAP:
+        if self.handler_key in HANDLER_MAP:
             payload = self.service_envelope.packet.decoded.payload
 
             if self.portnum_protocol.protobufFactory:
@@ -129,7 +133,7 @@ class PBPacketProcessor(PacketProcessor):
         logger.bind(**point_data).debug(f"Decoded packet: {point_data}")
 
         try:
-            for handler_cls in HANDLER_MAP.get(self.portnum, []):
+            for handler_cls in HANDLER_MAP.get(self.handler_key, []):
                 handler = handler_cls(
                     packet, self.payload_dict, point_data, strip_text=self.strip_text, force_decode=self.force_decode
                 )

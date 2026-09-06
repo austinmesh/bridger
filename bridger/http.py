@@ -1,7 +1,7 @@
 from aiohttp import ClientSession, ClientTimeout, web
 
 from bridger.config import EMQX_HTTP_CONNECT_TIMEOUT, MESHTASTIC_API_TIMEOUT, VERSION
-from bridger.meshtastic import DeviceModel
+from bridger.device_api import DeviceModel
 
 routes = web.RouteTableDef()
 device = None
