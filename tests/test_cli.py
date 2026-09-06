@@ -1,11 +1,11 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 from tenacity import wait_none
 
 from bridger.cli import create_user_command, delete_user_command, generate_apikey_command, list_users_command, main
-from bridger.gateway import GatewayError
+from bridger.gateway import GatewayBackendError, GatewayError
 
 
 @pytest.fixture(autouse=True)
@@ -68,6 +68,45 @@ class TestCreateUserCommand:
         create_user_command(args)
 
         assert mock_manager.create_gateway_user.call_count == 3
+
+    @patch("bridger.cli.GatewayManagerEMQX")
+    @patch("bridger.cli.console")
+    def test_create_user_retries_wrapped_connection_error(self, mock_console, mock_manager_class):
+        # create_gateway_user wraps connection failures in GatewayBackendError now, so the
+        # retry has to look through the wrapper instead of matching ConnectionError directly.
+        mock_manager = mock_manager_class.return_value
+        wrapped = GatewayBackendError("Could not reach EMQX", MagicMock())
+        wrapped.__cause__ = ConnectionError("Connection failed")
+        mock_manager.create_gateway_user.side_effect = [
+            wrapped,
+            wrapped,
+            (MagicMock(user_string="test_user"), "test_password"),
+        ]
+
+        args = MagicMock()
+        args.gateway_id = "12345678"
+        args.user_id = "987654321"
+
+        create_user_command(args)
+
+        assert mock_manager.create_gateway_user.call_count == 3
+
+    @patch("bridger.cli.GatewayManagerEMQX")
+    @patch("bridger.cli.console")
+    def test_create_user_does_not_retry_answered_http_error(self, mock_console, mock_manager_class):
+        # An expired API key is a 401. Retrying it five times with backoff helps nobody.
+        mock_manager = mock_manager_class.return_value
+        wrapped = GatewayBackendError("Error talking to EMQX", MagicMock(), status_code=401)
+        wrapped.__cause__ = HTTPError("401 Client Error")
+        mock_manager.create_gateway_user.side_effect = wrapped
+
+        args = MagicMock()
+        args.gateway_id = "12345678"
+        args.user_id = "987654321"
+
+        create_user_command(args)
+
+        assert mock_manager.create_gateway_user.call_count == 1
 
     def test_create_user_invalid_user_id_raises(self):
         args = MagicMock()

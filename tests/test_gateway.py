@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from discord import User
 from requests import HTTPError
+from requests.exceptions import ConnectionError, ConnectTimeout, RequestException
 
 from bridger.gateway import (
     GatewayAlreadyExistsError,
@@ -352,6 +353,25 @@ class TestCreateGatewayUserErrorMapping:
 
         with pytest.raises(GatewayError):
             gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+    def test_connection_error_maps_to_backend_error(self, gateway_manager, emqx_mock):
+        # A response-less failure has no status to map, but it still has to stay inside the
+        # GatewayError hierarchy or the Discord cog reports it as an unhandled command error.
+        emqx_mock.create_user.side_effect = ConnectionError("connection refused")
+
+        with pytest.raises(GatewayBackendError) as e:
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        assert e.value.status_code is None
+        assert isinstance(e.value.__cause__, ConnectionError)
+
+    def test_timeout_maps_to_backend_error(self, gateway_manager, emqx_mock):
+        emqx_mock.create_user.side_effect = ConnectTimeout("timed out")
+
+        with pytest.raises(GatewayBackendError) as e:
+            gateway_manager.create_gateway_user("1a2b3c4d", mock_discord_user)
+
+        assert isinstance(e.value.__cause__, RequestException)
 
 
 class TestCreateGatewayUserRollback:

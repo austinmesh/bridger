@@ -230,10 +230,13 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
             return f"Gateway already exists: {node_id}"
 
         if isinstance(error, GatewayValidationError):
-            return f"Invalid gateway request for {node_id}: {error}"
+            return f"Invalid gateway request for {node_id}. Check the node ID and try again."
 
+        # Deliberately no exception text here: the string requests builds for an HTTPError
+        # carries the EMQX URL and API path, and this message goes to a Discord user. The
+        # detail is logged in cog_app_command_error instead.
         status = f" (HTTP {error.status_code})" if error.status_code else ""
-        return f"Gateway backend error for {node_id}{status}: {error}"
+        return f"Gateway backend error for {node_id}{status}. Please try again later or contact an admin."
 
     async def cog_app_command_error(self, interaction: Interaction, error: app_commands.AppCommandError):
         # Log the type of error and error message
@@ -241,12 +244,16 @@ class MQTTCog(commands.GroupCog, name="bridger-mqtt"):
 
         if isinstance(error, app_commands.errors.CommandInvokeError):
             if isinstance(error.original, GatewayError):
+                logger.opt(exception=error.original).warning(
+                    f"Gateway command failed for node {error.original.gateway.node_hex_id_without_bang}"
+                )
                 await interaction.response.send_message(
                     self._describe_gateway_error(error.original),
                     ephemeral=True,
                     delete_after=self.delete_after,
                 )
             else:
+                logger.opt(exception=error.original).warning("Command invoke error")
                 await interaction.response.send_message(
                     f"Command invoke error: {error.original}", ephemeral=True, delete_after=self.delete_after
                 )
