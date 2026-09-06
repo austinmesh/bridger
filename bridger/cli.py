@@ -3,14 +3,14 @@ import os
 import secrets
 from pathlib import Path
 
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, HTTPError
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from bridger.emqx import EMQXClient
-from bridger.gateway import GatewayError, GatewayManagerEMQX
+from bridger.gateway import GatewayBackendError, GatewayError, GatewayManagerEMQX
 
 console = Console()
 
@@ -21,10 +21,26 @@ EMQX_URL = os.getenv("EMQX_URL")
 emqx = EMQXClient(EMQX_URL, EMQX_API_KEY, EMQX_SECRET_KEY)
 
 
+def _is_retriable(exception: BaseException) -> bool:
+    """Decide whether a create_gateway_user failure is worth another attempt.
+
+    create_gateway_user wraps request failures in GatewayBackendError, so a plain
+    retry_if_exception_type on ConnectionError stopped matching once that wrapping existed.
+    Unwrap one level, and refuse to retry anything EMQX actually answered.
+    """
+    if isinstance(exception, GatewayBackendError):
+        exception = exception.__cause__
+
+    if isinstance(exception, HTTPError):
+        return False
+
+    return isinstance(exception, (ConnectionError, OSError))
+
+
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=1, max=60),
-    retry=retry_if_exception_type((ConnectionError, OSError)),
+    retry=retry_if_exception(_is_retriable),
     reraise=True,
 )
 def create_user_command(args):
@@ -48,6 +64,11 @@ def create_user_command(args):
 
         console.print(table)
     except GatewayError as e:
+        # Let tenacity see the failures worth another attempt. Catching every GatewayError here
+        # would swallow them before the decorator ever runs.
+        if _is_retriable(e):
+            raise
+
         console.print(f"Error creating gateway user: {e}", style="bold red")
 
 

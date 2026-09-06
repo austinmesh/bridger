@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from discord import Member, User
-from requests import HTTPError
+from requests import HTTPError, RequestException
 
 from bridger.config import MQTT_TOPIC
 from bridger.dataclasses import NodeMixin
@@ -143,6 +143,11 @@ class GatewayManagerEMQX:
             self.emqx.create_user(self.authentication_id, gateway.user_string, password)
         except HTTPError as e:
             raise self._map_http_error(e, gateway) from e
+        except RequestException as e:
+            # Timeouts and connection resets never reach _map_http_error because they carry no
+            # response. Without this they escape the GatewayError hierarchy entirely and the
+            # caller reports them as an unhandled command error.
+            raise GatewayBackendError(f"Could not reach EMQX: {e}", gateway) from e
 
         # Roll the user back if the rules do not land. Otherwise the account exists with no
         # ACL rules, the caller never receives the password, and every retry from here on
