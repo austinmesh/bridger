@@ -1,8 +1,6 @@
 [Container]
 Image = docker.io/library/influxdb:2.8.0
-# Loopback only. bridger/bot/http reach InfluxDB over bridger.network as
-# http://influxdb:8086; this port is just the admin UI and API.
-PublishPort = 127.0.0.1:8086:8086
+PublishPort = 8086:8086
 Volume = influxdb-data.volume:/var/lib/influxdb2
 Volume = influxdb-config.volume:/etc/influxdb2
 Network = bridger.network
