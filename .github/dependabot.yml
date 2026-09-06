@@ -8,3 +8,18 @@ updates:
     directory: "/.github/workflows"
     schedule:
       interval: weekly
+  # compose.yaml is the source of truth for infra image tags. Dependabot has no concept of
+  # quadlet files, so tests/test_image_parity.py fails until the bump is mirrored into
+  # config/quadlet/*.container.
+  - package-ecosystem: docker-compose
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: "/config/docker/simple-proxy"
+    schedule:
+      interval: weekly

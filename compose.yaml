@@ -108,15 +108,14 @@ services:
       - emqx
 
   emqx:
-    image: docker.io/emqx/emqx:5.10.3
+    image: docker.io/emqx/emqx:6.3.0
     hostname: emqx
     environment:
-      - EMQX_ALLOW_ANONYMOUS
       - EMQX_DEFAULT_LOG_HANDLER
-      - EMQX_LISTENER__SSL__KEYFILE
-      - EMQX_LISTENER__SSL__CERTFILE
-      - EMQX_LISTENER__WSS__KEYFILE
-      - EMQX_LISTENER__WSS__CERTFILE
+      - EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE
+      - EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE
+      - EMQX_LISTENERS__WSS__DEFAULT__SSL_OPTIONS__KEYFILE
+      - EMQX_LISTENERS__WSS__DEFAULT__SSL_OPTIONS__CERTFILE
       - EMQX_NODE__COOKIE
       - EMQX_HOST
       - EMQX_API_KEY__BOOTSTRAP_FILE=/opt/emqx/etc/api_key.bootstrap
@@ -125,7 +124,7 @@ services:
       - "8083:8083"
       - "8084:8084"
       - "8883:8883"
-      - "18083:18083"
+      - "127.0.0.1:18083:18083"
     volumes:
       - emqx-config:/opt/emqx/etc
       - emqx-data:/opt/emqx/data
@@ -135,10 +134,10 @@ services:
     restart: always
 
   influxdb:
-    image: docker.io/library/influxdb:2.7.12
+    image: docker.io/library/influxdb:2.8.0
     hostname: influxdb
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_V2_USERNAME:-bridger}
@@ -149,13 +148,12 @@ services:
     volumes:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
-      - emqx-config:/opt/emqx/etc
     networks:
       - bridger
     restart: always
 
   grafana:
-    image: docker.io/grafana/grafana-oss:12.4.3
+    image: docker.io/grafana/grafana:13.2.1
     hostname: grafana
     ports:
       - "3000:3000"
@@ -181,7 +179,7 @@ services:
     restart: always
 
   loki:
-    image: docker.io/grafana/loki:3.7.1
+    image: docker.io/grafana/loki:3.7.7
     hostname: loki
     command: ["-config.file=/mnt/config/loki.yaml"]
     volumes:
@@ -212,7 +210,7 @@ services:
       - loki
 
   certbot:
-    image: docker.io/certbot/certbot:v5.5.0
+    image: docker.io/certbot/certbot:v5.8.0
     hostname: certbot
     command: ["certonly", "--standalone", "--non-interactive", "--agree-tos", "-d", "${CERTBOT_DOMAIN:-mybridger.com}", "--email", "${CERTBOT_EMAIL:-my@emailaddress.com}"]
     ports:

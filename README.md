@@ -19,8 +19,12 @@ Copy the the `.env.default` file to `.env` and view for the environment variable
 
 There are some other tunables as well:
 
+ - MQTT_BROKER, MQTT_PORT: Broker to connect to. Defaults to port 1883.
+ - MQTT_CLIENT_ID: Base client ID. Suffixed per process (`-bridger`, `-testmsg`) so the two
+   connections do not evict each other from the broker.
  - INFLUXDB_V2_WRITE_PRECISION
  - MESHTASTIC_API_CACHE_TTL: The time to cache the Meshtastic API data. Defaults to 6 hours.
+ - MESHTASTIC_API_TIMEOUT
  - MESHTASTIC_KEY: The base64 encoded encryption key for the primary channel. Defaults to the the key provided by `AQ==`
  - MQTT_TEST_CHANNEL
  - MQTT_TEST_CHANNEL_ID
@@ -30,7 +34,14 @@ There are some other tunables as well:
  - EMQX_API_KEY
  - EMQX_SECRET_KEY
  - EMQX_URL
+ - EMQX_HTTP_CONNECT_TIMEOUT, EMQX_HTTP_READ_TIMEOUT
  - LOG_PATH: Set this to a file path to log to a file. Defaults to `logs/bridger.log`
+ - LOGURU_LEVEL: Log level. Defaults to `INFO`.
+ - SENTRY_DSN: Read by the Sentry SDK directly. Leave unset to disable error reporting.
+   SENTRY_RELEASE, SENTRY_TRACES_SAMPLE_RATE and SENTRY_PROFILES_SAMPLE_RATE are also honoured.
+
+`.env.default` lists every supported variable, including the `BRIDGER_*` cache and backoff
+knobs whose defaults are fine for a normal deployment.
 
 
 Then install the required packages in a Python virtual environment:
@@ -111,3 +122,10 @@ podman compose up -d
  - EMQX Dashboard: http://localhost:18083
  - InfluxDB Dashboard: http://localhost:8086
  - Grafana Dashboard: http://localhost:3000
+
+In production the EMQX dashboard and the InfluxDB API are published on loopback only, so
+reach them over an SSH tunnel rather than directly:
+
+```bash
+ssh -L 18083:127.0.0.1:18083 -L 8086:127.0.0.1:8086 your-host
+```

@@ -89,6 +89,19 @@ gateway_id: "!6a8b84ba"
 
 ## InfluxDB
 
+### Known schema tradeoffs
+
+`long_name` and `short_name` are tags on the `node` measurement, so renaming a node forks its
+series and the old one lives on until retention expires it. Accepted deliberately: the mesh is
+small enough that the cardinality growth is slow, and demoting them to fields would split every
+node series at the cutover and break any dashboard query that groups or filters by name.
+Revisit if series count becomes a problem.
+
+Deduplication is scoped by `(gateway_id, packet_id)`, so every gateway that hears a packet
+writes its own point. That is what makes `rx_snr`/`rx_rssi` meaningful per gateway and what
+makes `/bridger-mqtt is-alive` accurate, at the cost of multiplying point count by the average
+gateway fan-out.
+
 ### Queries
 
 Get nodes in multiple ways:
