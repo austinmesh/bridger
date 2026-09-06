@@ -10,9 +10,7 @@ PublishPort = 1883:1883
 PublishPort = 8083:8083
 PublishPort = 8084:8084
 PublishPort = 8883:8883
-# Dashboard: loopback only. The bridger/bot/http services reach EMQX over bridger.network
-# as http://emqx:18083, so nothing internal is affected. Use ssh -L to reach it remotely.
-PublishPort = 127.0.0.1:18083:18083
+PublishPort = 18083:18083
 Environment = EMQX_DEFAULT_LOG_HANDLER=console
 # EMQX 5/6 key names. The old EMQX_LISTENER__SSL__* form is EMQX 4.x and was silently
 # ignored, so 8883/8084 served the demo certificate bundled in the image while certbot

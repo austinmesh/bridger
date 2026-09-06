@@ -124,7 +124,7 @@ services:
       - "8083:8083"
       - "8084:8084"
       - "8883:8883"
-      - "127.0.0.1:18083:18083"
+      - "18083:18083"
     volumes:
       - emqx-config:/opt/emqx/etc
       - emqx-data:/opt/emqx/data
@@ -137,7 +137,7 @@ services:
     image: docker.io/library/influxdb:2.8.0
     hostname: influxdb
     ports:
-      - "127.0.0.1:8086:8086"
+      - "8086:8086"
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_V2_USERNAME:-bridger}
