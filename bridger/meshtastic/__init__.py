@@ -1,9 +1,9 @@
 from collections import defaultdict
 
-from aiocache import cached
+from aiocache import cached_stampede
 from aiohttp import ClientSession
 
-from bridger.config import MESHTASTIC_API_CACHE_TTL, MESHTASTIC_API_ENDPOINT
+from bridger.config import MESHTASTIC_API_CACHE_TTL, MESHTASTIC_API_ENDPOINT, MESHTASTIC_API_TIMEOUT
 
 
 class DeviceModel:
@@ -12,7 +12,10 @@ class DeviceModel:
     def __init__(self, session: ClientSession = None):
         self.session = session
 
-    @cached(ttl=MESHTASTIC_API_CACHE_TTL, noself=True)
+    # Stampede-protected rather than plain @cached: the HTTP routes share one DeviceModel, so
+    # concurrent requests against a cold cache would each fetch the upstream API. The lease
+    # covers the client timeout, so the lock cannot expire while a fetch is still in flight.
+    @cached_stampede(lease=MESHTASTIC_API_TIMEOUT, ttl=MESHTASTIC_API_CACHE_TTL, noself=True)
     async def make_request(self) -> list:
         async with self.session.get(MESHTASTIC_API_ENDPOINT + self.device_hardware_path) as response:
             return await response.json()

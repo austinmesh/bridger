@@ -66,11 +66,11 @@ def make_interaction(*, user_id=1, guild=True, guild_roles=(), user_roles=(), me
 @pytest.fixture(autouse=True)
 async def clear_caches():
     # Module-level caches are shared across tests; TTL uses loop.call_later so this must be async.
-    await mqtt_cog.node_cache.clear()
-    await mqtt_cog.gateway_cache.clear()
+    await mqtt_cog.node_cache.invalidate()
+    await mqtt_cog.gateway_cache.invalidate()
     yield
-    await mqtt_cog.node_cache.clear()
-    await mqtt_cog.gateway_cache.clear()
+    await mqtt_cog.node_cache.invalidate()
+    await mqtt_cog.gateway_cache.invalidate()
 
 
 @pytest.fixture

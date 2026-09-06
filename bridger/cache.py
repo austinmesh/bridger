@@ -72,10 +72,8 @@ class TTLCache[T]:
             return await self._load(key, loader)
 
     async def invalidate(self, key: Optional[str] = None) -> None:
+        """Drop one key, or the whole cache when key is None."""
         if key is None:
             await self._cache.clear()
         else:
             await self._cache.delete(key)
-
-    async def clear(self) -> None:
-        await self._cache.clear()
