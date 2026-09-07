@@ -100,7 +100,7 @@ jobs:
 
       - name: Build bridger image
         id: build_image
-        uses: redhat-actions/buildah-build@v2.13
+        uses: redhat-actions/buildah-build@v3
         with:
           image: ghcr.io/${{ github.repository }}
           platforms: linux/amd64
@@ -111,7 +111,7 @@ jobs:
 
       - name: Build simple-proxy image
         id: build_simple_proxy
-        uses: redhat-actions/buildah-build@v2.13
+        uses: redhat-actions/buildah-build@v3
         with:
           image: ghcr.io/${{ github.repository_owner }}/simple-proxy
           platforms: linux/amd64,linux/arm64
