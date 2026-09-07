@@ -1,4 +1,3 @@
-import os
 import re
 import secrets
 import string
@@ -8,14 +7,11 @@ from typing import Optional, Union
 from discord import Member, User
 from requests import HTTPError, RequestException
 
-from bridger.config import MQTT_TOPIC
+from bridger.config import EMQX_API_KEY, EMQX_SECRET_KEY, EMQX_URL, MQTT_TOPIC
 from bridger.dataclasses import NodeMixin
 from bridger.emqx import EMQXClient
 from bridger.log import logger
 
-EMQX_API_KEY = os.getenv("EMQX_API_KEY")
-EMQX_SECRET_KEY = os.getenv("EMQX_SECRET_KEY")
-EMQX_URL = os.getenv("EMQX_URL")
 PASSWORD_LENGTH = 10
 
 emqx = EMQXClient(EMQX_URL, EMQX_API_KEY, EMQX_SECRET_KEY)

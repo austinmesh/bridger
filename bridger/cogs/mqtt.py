@@ -1,5 +1,4 @@
 import asyncio
-import os
 import re
 import time
 from datetime import UTC, datetime
@@ -10,6 +9,13 @@ from discord.ext import commands, tasks
 from discord.utils import get
 
 from bridger.cache import TTLCache
+from bridger.config import (
+    AUTOCOMPLETE_DEADLINE,
+    BRIDGER_ADMIN_ROLE,
+    GATEWAY_CACHE_TTL,
+    NODE_CACHE_REFRESH_SECONDS,
+    NODE_CACHE_TTL,
+)
 from bridger.dataclasses import AnnotationPoint
 from bridger.gateway import (
     GatewayAlreadyExistsError,
@@ -21,15 +27,8 @@ from bridger.gateway import (
 from bridger.influx.interfaces import InfluxReader, InfluxWriter
 from bridger.log import logger
 
-BRIDGER_ADMIN_ROLE = os.getenv("BRIDGER_ADMIN_ROLE", "Bridger Admin")
-
 # The node list TTL is deliberately twice the refresh interval, so one failed background
 # refresh never empties the cache and drops users back onto the blocking path.
-NODE_CACHE_TTL = int(os.getenv("BRIDGER_NODE_CACHE_TTL", 600))
-NODE_CACHE_REFRESH_SECONDS = int(os.getenv("BRIDGER_NODE_CACHE_REFRESH", 300))
-GATEWAY_CACHE_TTL = int(os.getenv("BRIDGER_GATEWAY_CACHE_TTL", 30))
-AUTOCOMPLETE_DEADLINE = float(os.getenv("BRIDGER_AUTOCOMPLETE_DEADLINE", 2.0))
-
 NODE_CACHE_KEY = "all"
 GATEWAY_CACHE_KEY = "all"
 

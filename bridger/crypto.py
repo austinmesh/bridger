@@ -1,13 +1,11 @@
 import base64
-import os
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from bridger.config import MESHTASTIC_KEY
+
 MAX_BLOCKSIZE = 1024
-# Base64-encoded 16-byte AES-128 key. The default is the Meshtastic default channel PSK,
-# which is what the "AQ==" shorthand expands to.
-MESHTASTIC_KEY = os.getenv("MESHTASTIC_KEY", "1PG7OiApB1nwvP+rz05pAQ==")
 
 
 class CryptoEngine:

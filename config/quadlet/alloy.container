@@ -8,7 +8,7 @@ Image = docker.io/grafana/alloy:v1.10.2
 Network = bridger.network
 HostName = alloy
 PublishPort = 127.0.0.1:12345:12345
-Volume = /home/andy/.config/bridger:/mnt/config
+Volume = /home/andy/.config/bridger/alloy:/mnt/config
 Volume = bridger-data.volume:/var/lib/bridger:ro
 Volume = alloy-data.volume:/var/lib/alloy
 

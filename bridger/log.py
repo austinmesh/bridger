@@ -1,8 +1,7 @@
-import os
-
 from loguru import logger
 
-LOG_PATH = os.getenv("LOG_PATH", "logs/bridger.log")
+from bridger.config import LOG_PATH
+
 LOGURU_FORMAT = (
     "<level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
