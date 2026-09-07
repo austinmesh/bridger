@@ -121,14 +121,14 @@ jobs:
           containerfiles: ./config/docker/simple-proxy/Containerfile
 
       - name: Push image
-        uses: redhat-actions/push-to-registry@v2
+        uses: redhat-actions/push-to-registry@v3
         with:
           tags: ${{ steps.build_image.outputs.tags }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push simple-proxy manifests
-        uses: redhat-actions/push-to-registry@v2
+        uses: redhat-actions/push-to-registry@v3
         with:
           tags: ${{ steps.build_simple_proxy.outputs.tags }}
           username: ${{ github.repository_owner }}
