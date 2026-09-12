@@ -8,19 +8,28 @@
             "name": "Discord Bot",
             "type": "debugpy",
             "request": "launch",
-            "module": "bridger.bot"
+            "module": "bridger.bot",
+            "env": {
+                "LOG_PATH": "${workspaceFolder}/logs/bot.log"
+            }
         },
         {
             "name": "HTTP Server",
             "type": "debugpy",
             "request": "launch",
-            "module": "bridger.http"
+            "module": "bridger.http",
+            "env": {
+                "LOG_PATH": "${workspaceFolder}/logs/http.log"
+            }
         },
         {
             "name": "Bridger",
             "type": "debugpy",
             "request": "launch",
-            "module": "bridger"
+            "module": "bridger",
+            "env": {
+                "LOG_PATH": "${workspaceFolder}/logs/bridger.log"
+            }
         }
     ],
     "compounds": [
