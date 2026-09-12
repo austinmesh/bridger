@@ -32,6 +32,8 @@ services:
     depends_on:
       - influxdb
       - emqx
+    profiles:
+      - app
 
   bot:
     image: ${IMAGE:-ghcr.io/austinmesh/bridger:latest}
@@ -69,6 +71,8 @@ services:
     depends_on:
       - influxdb
       - emqx
+    profiles:
+      - app
 
   http:
     image: ${IMAGE:-ghcr.io/austinmesh/bridger:latest}
@@ -106,6 +110,8 @@ services:
     depends_on:
       - influxdb
       - emqx
+    profiles:
+      - app
 
   emqx:
     image: docker.io/emqx/emqx:5.10.3
@@ -204,6 +210,7 @@ services:
     volumes:
       - ./config/alloy:/mnt/config
       - bridger-data:/var/lib/bridger:ro
+      - ./logs:/var/lib/bridger-dev/logs:ro
       - alloy-data:/var/lib/alloy
     networks:
       - bridger

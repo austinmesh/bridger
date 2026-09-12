@@ -20,6 +20,23 @@ local.file_match "bridger_logs" {
       job      = "bridger",
       service  = "http",
     },
+    // Dev: apps run under Python on the host and write to ./logs, which is
+    // bind-mounted here. Missing files are simply not matched.
+    {
+      __path__ = "/var/lib/bridger-dev/logs/bridger.log",
+      job      = "bridger",
+      service  = "bridger",
+    },
+    {
+      __path__ = "/var/lib/bridger-dev/logs/bot.log",
+      job      = "bridger",
+      service  = "bot",
+    },
+    {
+      __path__ = "/var/lib/bridger-dev/logs/http.log",
+      job      = "bridger",
+      service  = "http",
+    },
   ]
 
   sync_period = "10s"
