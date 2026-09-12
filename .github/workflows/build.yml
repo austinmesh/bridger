@@ -115,6 +115,9 @@ jobs:
         with:
           image: ghcr.io/${{ github.repository_owner }}/simple-proxy
           platforms: linux/amd64,linux/arm64
+          # Parallel per-platform builds share one containers storage and race over the base
+          # image name, so whichever loses hits "image not known" partway through.
+          sequential: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/simple-proxy:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/simple-proxy:latest
