@@ -56,7 +56,7 @@ mdurl==0.1.2
     # via markdown-it-py
 meshtastic==2.7.11
     # via bridger (pyproject.toml)
-multidict==6.7.1
+multidict==6.8.0
     # via
     #   aiohttp
     #   yarl
