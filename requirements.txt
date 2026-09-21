@@ -121,5 +121,5 @@ urllib3==2.7.0
     #   influxdb-client
     #   requests
     #   sentry-sdk
-yarl==1.24.5
+yarl==1.25.1
     # via aiohttp
